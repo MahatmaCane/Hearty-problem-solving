@@ -3,12 +3,12 @@
 import numpy as np
 import random
 
-class Substrate:
+class Myocardium:
 
 	def __init__(self, tissue_shape=(5, 5), nu=0.5, delta=0.2, p=0.4, refractory_period=5):
 
-		assert isinstance(tissue_shape, tuple), 'Expected tuple, got {}'.type(tissue_shape)
-		self.shape = tissue_shape
+		assert isinstance(tissue_shape, tuple), 'Expected tuple, got {}'.format(type(tissue_shape))
+        self.shape = tissue_shape
 		self._nu = nu
 		self._delta = delta
 		self._p = p

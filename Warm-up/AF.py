@@ -4,7 +4,7 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from AFModel import Substrate
+from AFModel import Myocardium
 
 class TimeTracker:
 
@@ -29,7 +29,7 @@ class TimeTracker:
 def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8, delta=0.05, p=0.95, refractory_period=50):
 
 	ax = plt.gca()
-	s = Substrate(tissue_shape, nu, delta, p, refractory_period)
+	s = Myocardium(tissue_shape, nu, delta, p, refractory_period)
 	qm = ax.pcolorfast(s.counts_until_relaxed)
 	qm.set_array(s.counts_until_relaxed)
 	ax.set_title('0')
