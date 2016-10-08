@@ -9,59 +9,60 @@ from AFModel import Myocardium
 
 class TimeTracker:
 
-	def __init__(self, tmax=np.inf):
+    def __init__(self, tmax=np.inf):
 
-		self.tmax = tmax
-		self.tinit = 0
+        self.tmax = tmax
+        self.tinit = 0
 
-	def __iter__(self):
-		
-		t = 1
-		while t < self.tmax:
-			yield t
-			if self.stop is True:
-				raise StopIteration()
-			t += 1
+    def __iter__(self):
 
-	def stop(self):
+        t = 1
+        while t < self.tmax:
+            yield t
+            if self.stop is True:
+                raise StopIteration()
+            t += 1
 
-		self.stop = True
+    def stop(self):
+
+        self.stop = True
 
 def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8, 
-        delta=0.05, p=0.95, refractory_period=50):
+        delta=0.05, p=0.95, refractory_period=50, animate=True):
 
-	ax = plt.gca()
-	s = Myocardium(tissue_shape, nu, delta, p, refractory_period)
-	qm = ax.pcolorfast(s.counts_until_relaxed)
-	qm.set_array(s.counts_until_relaxed)
-	ax.set_title('0')
-	tt = TimeTracker()
-	plt.draw()
-	plt.pause(0.01)
+    s = Myocardium(tissue_shape, nu, delta, p, refractory_period)
+    tt = TimeTracker()
 
-	fig = ax.get_figure()
+    if animate == True:
+        ax = plt.gca()
+        fig = ax.get_figure()
+        qm = ax.pcolorfast(s.counts_until_relaxed)
+        qm.set_array(s.counts_until_relaxed)
+        ax.set_title('0')
+        plt.draw()
+        plt.pause(0.01)
 
-	def handle_close(evt):
-		tt.stop()
+        def handle_close(evt):
+            tt.stop()
 
-	fig.canvas.mpl_connect('close_event', handle_close)
+        fig.canvas.mpl_connect('close_event', handle_close)
+    else:
+        print "Beginning simulation."
 
-	for time in tt:
-		s.evolve_wavefront()
-		s.update_counts_until_relaxed()
-		if time%heart_rate == 0:
-			s.pulse()
-			qm.set_array(s.counts_until_relaxed)
-			ax.set_title('{}'.format(time))
-			plt.draw()
-		else:
-			qm.set_array(s.counts_until_relaxed)
-			ax.set_title('{}'.format(time))
-			plt.draw()
-		plt.pause(0.01)
+    for time in tt:
+        s.evolve_wavefront()
+        s.update_counts_until_relaxed()
+        if time%heart_rate == 0:
+            s.pulse()
+
+        if animate == True:
+            qm.set_array(s.counts_until_relaxed)
+            ax.set_title('{}'.format(time))
+            plt.draw()
+            plt.pause(0.01)
 
 if __name__ == "__main__":
-    
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--shape', '-s', type=int, default=200,
@@ -71,6 +72,8 @@ if __name__ == "__main__":
                         help='delta')
     parser.add_argument('--epsilon', '-e', type=float, default=0.95,
                         help='epsilon')
+    parser.add_argument('--animate', '-a', action='store_true')
     args = parser.parse_args()
-    
-    run(nu=args.nu, delta=args.delta, p=args.epsilon, tissue_shape=(200, args.shape))
+
+    run(nu=args.nu, delta=args.delta, p=args.epsilon, animate=args.animate,
+        tissue_shape=(200, args.shape))
