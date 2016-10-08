@@ -7,6 +7,14 @@ import matplotlib.pyplot as plt
 
 from AFModel import Myocardium
 
+class Ablater:
+
+    def __init__(self, one_corner):
+        self.first_corner = one_corner
+
+    def set_final_corner(self, corner):
+        self.final_corner = corner
+
 class TimeTracker:
 
     def __init__(self, tmax=np.inf):
@@ -45,7 +53,17 @@ def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8,
         def handle_close(evt):
             tt.stop()
 
+        def store_corner(evt):
+            global ablater
+            ablater = Ablater((evt.xdata, evt.ydata))
+
+        def ablate(evt):
+            ablater.set_final_corner((evt.xdata, evt.ydata))
+            s.render_unexcitable(ablater.first_corner, ablater.final_corner)
+
         fig.canvas.mpl_connect('close_event', handle_close)
+        fig.canvas.mpl_connect('button_press_event', store_corner)
+        fig.canvas.mpl_connect('button_release_event', ablate)
     else:
         print "Beginning simulation."
 
