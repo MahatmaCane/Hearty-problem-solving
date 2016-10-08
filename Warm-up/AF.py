@@ -1,9 +1,10 @@
 #### Copyright Joel Dyer, 29/07/2016 ####
 
-
+import argparse
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+
 from AFModel import Myocardium
 
 class TimeTracker:
@@ -26,7 +27,8 @@ class TimeTracker:
 
 		self.stop = True
 
-def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8, delta=0.05, p=0.95, refractory_period=50):
+def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8, 
+        delta=0.05, p=0.95, refractory_period=50):
 
 	ax = plt.gca()
 	s = Myocardium(tissue_shape, nu, delta, p, refractory_period)
@@ -57,3 +59,18 @@ def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8, delta=0.05
 			ax.set_title('{}'.format(time))
 			plt.draw()
 		plt.pause(0.01)
+
+if __name__ == "__main__":
+    
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--shape', '-s', type=int, default=200,
+                        help='Myocardium dimensions')
+    parser.add_argument('--nu', '-n', type=float, default=0.21, help='Nu')
+    parser.add_argument('--delta', '-d', type=float, default=0.05,
+                        help='delta')
+    parser.add_argument('--epsilon', '-e', type=float, default=0.95,
+                        help='epsilon')
+    args = parser.parse_args()
+    
+    run(nu=args.nu, delta=args.delta, p=args.epsilon, tissue_shape=(200, args.shape))
