@@ -7,7 +7,21 @@ import matplotlib.pyplot as plt
 
 from AFModel import Myocardium
 
+class Electrogram:
+
+    """Records number of activated cells at each time step."""
+
+    def __init__(self):
+        self.activity = []
+        self.time = []
+
+    def record(self, time, activity):
+        self.time.append(time)
+        self.activity.append(activity)
+
 class Ablater:
+
+    """Ablates specified region of myocardium."""
 
     def __init__(self, one_corner):
         self.first_corner = one_corner
@@ -36,16 +50,16 @@ class TimeTracker:
         self.stop = True
 
 def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8, 
-        delta=0.05, p=0.95, refractory_period=50, animate=True):
+        d=0.05, e=0.95, refractory_period=50, animate=True, electrogram=False):
 
-    s = Myocardium(tissue_shape, nu, delta, p, refractory_period)
-    tt = TimeTracker()
+    myocardium = Myocardium(tissue_shape, nu, d, e, refractory_period)
+    tt = TimeTracker(tmax)
 
     if animate == True:
         ax = plt.gca()
         fig = ax.get_figure()
-        qm = ax.pcolorfast(s.counts_until_relaxed)
-        qm.set_array(s.counts_until_relaxed)
+        qm = ax.pcolorfast(myocardium.counts_until_relaxed)
+        qm.set_array(myocardium.counts_until_relaxed)
         ax.set_title('0')
         plt.draw()
         plt.pause(0.01)
@@ -67,31 +81,47 @@ def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8,
     else:
         print "Beginning simulation."
 
+    if electrogram == True:
+        egram = Electrogram()
+        myocardium.determine_number_of_active_cells()
+        egram.record(0, myocardium._num_active_cells)
+
     for time in tt:
-        s.evolve_wavefront()
-        s.update_counts_until_relaxed()
+        myocardium.evolve_wavefront()
+        myocardium.update_counts_until_relaxed()
         if time%heart_rate == 0:
-            s.pulse()
+            myocardium.pulse()
 
         if animate == True:
-            qm.set_array(s.counts_until_relaxed)
+            qm.set_array(myocardium.counts_until_relaxed)
             ax.set_title('{}'.format(time))
             plt.draw()
             plt.pause(0.01)
+
+        if electrogram == True:
+            myocardium.determine_number_of_active_cells()
+            egram.record(time, myocardium._num_active_cells)
+
+    if electrogram == True:
+        return np.array([egram.time, egram.activity])
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--shape', '-s', type=int, default=200,
-                        help='Myocardium dimensions')
-    parser.add_argument('--nu', '-n', type=float, default=0.21, help='Nu')
+                        help='Myocardium dimensions.')
+    parser.add_argument('--nu', '-n', type=float, default=0.21,
+                        help='Fraction of existing lateral couplings.')
     parser.add_argument('--delta', '-d', type=float, default=0.05,
-                        help='delta')
+                        help='Fraction of defective cells.')
     parser.add_argument('--epsilon', '-e', type=float, default=0.95,
-                        help='epsilon')
-    parser.add_argument('--animate', '-a', action='store_true')
+                        help='Probability that defective cell fails to fire.')
+    parser.add_argument('--animate', '-a', action='store_true', 
+                        help='Animation switch for live animation.')
+    parser.add_argument('--electrogram', '-g', action='store_true',
+                        help='Switch for recording activity with time.')
     args = parser.parse_args()
 
-    run(nu=args.nu, delta=args.delta, p=args.epsilon, animate=args.animate,
-        tissue_shape=(200, args.shape))
+    run(nu=args.nu, d=args.delta, e=args.epsilon, animate=args.animate,
+        tissue_shape=(200, args.shape), electrogram=args.electrogram)
