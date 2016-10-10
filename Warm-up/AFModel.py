@@ -82,3 +82,7 @@ class Myocardium:
         little_y = int(min(one_corner[1], another_corner[1]))
         big_y = int(max(one_corner[1], another_corner[1]))
         self.permanently_unexcitable[little_y:big_y, little_x:big_x] = 1
+
+    def determine_number_of_active_cells(self):
+
+        self._num_active_cells = np.sum(self.wavefront)

@@ -4,6 +4,8 @@ import argparse
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import os
+import pickle
 
 from AFModel import Myocardium
 
@@ -49,8 +51,11 @@ class TimeTracker:
 
         self.stop = True
 
-def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8, 
-        d=0.05, e=0.95, refractory_period=50, animate=True, electrogram=False):
+def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8, d=0.05,
+        e=0.95, refractory_period=50, animate=True, electrogram=False):
+
+    args = {'heart rate':heart_rate, 'nu':nu, 'delta':d,
+            'epsilon':e, 'tmax':tmax}
 
     myocardium = Myocardium(tissue_shape, nu, d, e, refractory_period)
     tt = TimeTracker(tmax)
@@ -58,9 +63,10 @@ def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8,
     if animate == True:
         ax = plt.gca()
         fig = ax.get_figure()
-        qm = ax.pcolorfast(myocardium.counts_until_relaxed)
+        qm = ax.pcolorfast(myocardium.counts_until_relaxed, cmap='Greys_r')
         qm.set_array(myocardium.counts_until_relaxed)
-        ax.set_title('0')
+        myocardium.determine_number_of_active_cells()
+        ax.set_title('0, {}'.format(myocardium._num_active_cells))
         plt.draw()
         plt.pause(0.01)
 
@@ -79,7 +85,7 @@ def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8,
         fig.canvas.mpl_connect('button_press_event', store_corner)
         fig.canvas.mpl_connect('button_release_event', ablate)
     else:
-        print "Beginning simulation."
+        print "Beginning simulation with parameters: {}.".format(args)
 
     if electrogram == True:
         egram = Electrogram()
@@ -89,21 +95,25 @@ def run(tmax=np.inf, heart_rate=250, tissue_shape=(200, 200), nu=0.8,
     for time in tt:
         myocardium.evolve_wavefront()
         myocardium.update_counts_until_relaxed()
+        myocardium.determine_number_of_active_cells()
         if time%heart_rate == 0:
             myocardium.pulse()
 
         if animate == True:
             qm.set_array(myocardium.counts_until_relaxed)
-            ax.set_title('{}'.format(time))
+            ax.set_title('{0}, {1}'.format(time, myocardium._num_active_cells))
             plt.draw()
             plt.pause(0.01)
 
         if electrogram == True:
-            myocardium.determine_number_of_active_cells()
             egram.record(time, myocardium._num_active_cells)
 
     if electrogram == True:
-        return np.array([egram.time, egram.activity])
+        dirname = 'Data-{0}-{1}'.format(d, e)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+        with open(dirname + '/Run-{0}'.format(nu),'w') as fh:
+            pickle.dump(np.array([egram.time, egram.activity]), fh)
 
 if __name__ == "__main__":
 
