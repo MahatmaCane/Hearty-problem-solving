@@ -1,79 +1,78 @@
 #### Copyright Joel Dyer, 29/07/2016 ####
 
 import numpy as np
-import random
 
 class Myocardium:
 
-    def __init__(self, tissue_shape=(5, 5), nu=0.5, delta=0.2, p=0.4, refractory_period=5):
+    def __init__(self, tissue_shape=(5, 5), nu=0.5, d=0.2, e=0.4, refractory_period=5):
 
-        assert isinstance(tissue_shape, tuple), 'Expected tuple, got {}'.format(type(tissue_shape))
         self.shape = tissue_shape
         self._nu = nu
-        self._delta = delta
-        self._p = p
+        self._delta = d
+        self._epsilon = e
         self._refractory_period = refractory_period
 
-        self.determine_locations_of_lateral_couplings()
-        self.determine_locations_of_defective_cells()
+        self.__determine_locations_of_lateral_couplings()
+        self.__determine_locations_of_defective_cells()
 
-        self.counts_until_relaxed = np.zeros(self.shape)
-        self.wavefront = np.zeros(self.shape)
+        self.counts_until_relaxed = np.zeros(self.shape, dtype=np.float64)
+        self.wavefront = np.zeros(self.shape, dtype=np.bool)
         self.permanently_unexcitable = np.zeros(tissue_shape)
 
-        self.pulse()
-
-        self.find_excitable_cells()
-        
-    def determine_locations_of_lateral_couplings(self):
+    def __determine_locations_of_lateral_couplings(self):
 
         random = np.random.random(self.shape)
         self.lateral_couplings = random <= self._nu
 
-    def determine_locations_of_defective_cells(self):
+    def __determine_locations_of_defective_cells(self):
 
         random = np.random.random(self.shape)
         self._defective_cells = random <= self._delta
 
-    def find_excitable_cells(self):
+    def __find_cells_to_excite(self):
 
-        self.excitable_cells = self.counts_until_relaxed == 0
-        self.excitable_cells[self.permanently_unexcitable == 1] = 0
+        """Determines cells which are to excite in response to stimulus in the
+        next time step."""
 
-    def pulse(self):
+        # Four possible situations: cell completely relaxed & not defective;
+        # cell completely relaxed and defective; cell ablated (permanently
+        # unexcitable); cell still refractory (temporarily unexcitable).
 
-        self.find_excitable_cells()
-        cells_which_will_fire = self.find_cells_which_will_fire()
-        self.wavefront[:, 0] += cells_which_will_fire[:, 0] * self.excitable_cells[:, 0]
-        self.counts_until_relaxed[:,0] += cells_which_will_fire[:, 0] * self.excitable_cells[:, 0] * self._refractory_period
+        self.excitable_cells = np.ones(self.shape)
 
-    def update_counts_until_relaxed(self):
+        # Defective
+        self.excitable_cells[self._defective_cells] = np.random.random(np.sum(self._defective_cells))
+        self.excitable_cells = self.excitable_cells > self._epsilon
+        # Refractory
+        self.excitable_cells[self.counts_until_relaxed != 0] = False
+        # Ablated
+        self.excitable_cells[self.permanently_unexcitable == 1] = False
+        
+        # Remaining cells are relaxed and have no reason to not excite given
+        # a stimulus
+
+    def __update_counts_until_relaxed(self):
 
         refractory_cells = self.counts_until_relaxed > 0
         self.counts_until_relaxed[refractory_cells] -= 1
-        self.counts_until_relaxed += self.wavefront * self._refractory_period 
+        self.counts_until_relaxed[self.wavefront] = self._refractory_period 
+ 
+    def evolve(self, pulse=False):
 
-    def evolve_wavefront(self):
+        self.__find_cells_to_excite()
 
-        should_excite = np.zeros(self.shape, dtype=np.float)
-        self.find_excitable_cells()
-        should_excite[:, :-1] += self.wavefront[:, 1:] * self.excitable_cells[:, :-1]
-        should_excite[:, 1:] += self.wavefront[:, :-1] * self.excitable_cells[:, 1:]
-        should_excite += np.roll(self.wavefront, -1, axis=0) * self.lateral_couplings * self.excitable_cells
-        should_excite += np.roll(self.wavefront, 1, axis=0) * self.lateral_couplings * self.excitable_cells
-        should_excite[should_excite > 1] = 1
+        new_wavefront = np.roll(self.wavefront * self.lateral_couplings, -1, axis=0)
+        new_wavefront += np.roll(self.wavefront, 1, axis=0) * self.lateral_couplings
+        new_wavefront[:, :-1] += self.wavefront[:, 1:]
+        new_wavefront[:, 1:] += self.wavefront[:, :-1]
+        new_wavefront *= self.excitable_cells
 
-        cells_which_will_fire = self.find_cells_which_will_fire()
+        if pulse is True:
+            new_wavefront[:, 0] += self.excitable_cells[:, 0]
 
-        self.wavefront = cells_which_will_fire * should_excite
+        self.wavefront = new_wavefront
 
-    def find_cells_which_will_fire(self):
-
-        cells_which_will_fire = np.ones(self.shape)
-        cells_which_will_fire[self._defective_cells] = np.random.random(np.sum(self._defective_cells))
-        cells_which_will_fire[cells_which_will_fire <= self._p] = 0
-        cells_which_will_fire[cells_which_will_fire > self._p] = 1
-        return cells_which_will_fire
+        self.__update_counts_until_relaxed()
 
     def render_unexcitable(self, one_corner, another_corner):
         
@@ -83,6 +82,6 @@ class Myocardium:
         big_y = int(max(one_corner[1], another_corner[1]))
         self.permanently_unexcitable[little_y:big_y, little_x:big_x] = 1
 
-    def determine_number_of_active_cells(self):
+    def number_of_active_cells(self):
 
-        self._num_active_cells = np.sum(self.wavefront)
+        return np.sum(self.wavefront)
