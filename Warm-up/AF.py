@@ -9,6 +9,7 @@ import pickle
 import time
 
 from AFModel import Myocardium
+from AFTools import ECG
 
 class Electrogram:
 
@@ -70,6 +71,8 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
     args = {'heart rate':heart_rate, 'epsilon':e, 'delta':d, 'tmax':tmax, 
             'tau':ref_period, 'nu':nu, 'shape':tissue_shape}
 
+    ecg = ECG(99, 99, (200, 200))
+
     if state_file is not None:
         with open(state_file, 'r') as fh:
             state_dict = pickle.load(fh)
@@ -81,11 +84,13 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
         tt = TimeTracker(tmax=tmax)
 
     if animate == True:
-        ax = plt.gca()
-        fig = ax.get_figure()
+        fig, (ax, ecg_ax) = plt.subplots(1, 2)
         myo_state = myocardium.counts_until_relaxed
         qm = ax.pcolorfast(myo_state, cmap='Greys_r', vmin=0, vmax=ref_period)
         qm.set_array(myocardium.counts_until_relaxed)
+        ecg_ax.set_xlim([-250, 100])
+        ecg_ax.set_ylim([-300, 200])
+        (ecg_line,) = ecg_ax.plot(0, '-')
         plt.draw()
         plt.pause(0.0001)
         
@@ -136,6 +141,10 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
             qm.set_array(myocardium.counts_until_relaxed)
             count = myocardium.number_of_active_cells()
             ax.set_title('Time: {0}, Active Cells: {1}'.format(time, count))
+            (old_x1, old_x2) = ecg_ax.get_xlim()
+            ecg_ax.set_xlim([old_x1+1, old_x2+1])
+            ecg.get_ECG(myocardium.counts_until_relaxed, ref_period)
+            ecg_line.set_data(range(time+1), ecg.data)
             plt.draw()
             plt.pause(0.0001)
 
