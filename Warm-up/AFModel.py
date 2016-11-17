@@ -85,3 +85,10 @@ class Myocardium:
     def number_of_active_cells(self):
 
         return np.sum(self.wavefront)
+
+    def reset(self):
+
+        """Return Myocardium to resting state everywhere."""
+
+        self.counts_until_relaxed = 0
+        self.wavefront = False
