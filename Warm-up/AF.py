@@ -8,53 +8,8 @@ import os
 import pickle
 import time
 
+from AFTools import TotalActivity, TimeTracker, Ablater
 from AFModel import Myocardium
-
-class Electrogram:
-
-    """Records number of activated cells at each time step."""
-
-    def __init__(self):
-        self.activity = []
-        self.time = []
-
-    def record(self, time, activity):
-        self.time.append(time)
-        self.activity.append(activity)
-
-class Ablater:
-
-    """Ablates specified region of myocardium."""
-
-    def __init__(self, one_corner):
-        self.first_corner = one_corner
-
-    def set_final_corner(self, corner):
-        self.final_corner = corner
-
-class TimeTracker:
-
-    """Steps time forwards & controls termination of simulation when
-       animating."""
-
-    def __init__(self, tinit=0, tmax=np.inf):
-
-        self.tmax = tmax
-        self.tinit = tinit
-
-    def __iter__(self):
-
-        t = self.tinit
-        while t < self.tmax:
-            yield t
-            if self.stop is True:
-                raise StopIteration()
-            t += 1
-
-    def stop(self):
-
-        self.stop = True
-
 
 def state_pickler(out_dir, myocardium, random_state, t): 
 
@@ -117,7 +72,7 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
     if out_dir is not False:
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
-        egram = Electrogram()
+        egram = TotalActivity()
         egram.record(0, myocardium.number_of_active_cells())
 
     for time in tt:

@@ -5,6 +5,7 @@ import os
 import pickle
 import matplotlib.pyplot as plt
 from AFModel import Myocardium
+from AFTools import TimeTracker, TotalActivity
 
 params = dict(realisations = 60, tmax = 10e4, heart_rate = 250, 
         tissue_shape = (200,200), nu = 0.25, d = 0.05, e = 0.05, 
@@ -174,7 +175,7 @@ def risk_curve_plot():
 
 ########## INVESTIGATING ATTRACTOR DYNAMICS ############
 
-def probability_of_state_transition_type2(activity, x):
+def probability_of_state_transition(activity, x):
     """ For the first time when activity is equal to a given value, A = x, and when the dynamics proceeds to enter an attractor,
         this function generates a probability list (0s and 1s) for both the probability of the system evolving to 
         attractor 1 (associated with sinus rhythm) and to attractor 2 (associated with AF)."""
@@ -236,7 +237,7 @@ def probability_of_state_transition_type2(activity, x):
     
     return P1, P2
 
-def plot_prob_vs_x(data_type = None):
+def plot_prob_vs_x():
     """ 
     Loads or Generates data for probability that the state transitions to attractor 1
     or attractor 2 for a range of initial activity values, then plots that data.
@@ -251,16 +252,8 @@ def plot_prob_vs_x(data_type = None):
     nu = 0.13
     realisations = 40
 
-    if data_type == 1:
-        suffix = '-type1'
-    elif data_type == 2:
-        suffix = '-type2'
-    else:
-        print "Must specify data_type."
-        return None
-
     try:
-        data = pickle.load(open(dirname + '/prob-trans-curve-{0}-{1}'.format(nu, realisations) + suffix, "r"))
+        data = pickle.load(open(dirname + '/prob-trans-curve-{0}-{1}'.format(nu, realisations), "r"))
         prob_attr_1 = data[0]
         prob_attr_2 = data[1]
     except:
@@ -283,10 +276,7 @@ def plot_prob_vs_x(data_type = None):
             P2 = []
             for i in range(0,realisations):
                 activity = pickle.load(open(dirname + '/Run-{0}-{1}-{2}'.format(params['tmax'], nu, i), "r"))
-                if data_type == 1:
-                    p1, p2 = probability_of_state_transition_type1(activity, x)
-                elif data_type == 2:
-                    p1, p2 = probability_of_state_transition_type2(activity, x)
+                p1, p2 = probability_of_state_transition(activity, x)
                 ### For each x, Want to extend P1 for each i, then want to calculate the sum/length which gives the 'probability' of transition to attractor 1
                 P1.extend(p1)
                 P2.extend(p2)
@@ -329,7 +319,6 @@ def plot_activity(nu, i):
 
 if __name__ == "__main__":
 
-    from AF import TimeTracker
     # risk_curve_data_generator()
     # risk_curve_plot()
     # plot_activity(nu = 0.075, i = 1)
