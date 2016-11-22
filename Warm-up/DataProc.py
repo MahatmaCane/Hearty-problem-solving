@@ -21,7 +21,6 @@ def risk_curve_data_generator():
            0.14, 0.16, 0.18, 0.2, 0.22, 
            0.24, 0.26, 0.28, 0.3, 0.1]
 
-
     dirname = 'Data-{0}-{1}-egram-activity'.format(params['d'], params['e'])
     if not os.path.exists(dirname):
         os.makedirs(dirname)
@@ -237,25 +236,19 @@ def probability_of_state_transition(activity, x):
     
     return P1, P2
 
-def plot_prob_vs_x():
+def plot_prob_vs_x(nu = 0.13, realisations = 40):
     """ 
     Loads or Generates data for probability that the state transitions to attractor 1
     or attractor 2 for a range of initial activity values, then plots that data.
     This is designed to show that there are indeed attractors of the dynamics.
-    Args:
-        data_type: If set to 1, uses probability data extracted from activity lists 
-                   including data for intermittent episodes of AF.
-                   If set to 2, uses probability data extracted from activity lists
-                   where only the first data point of activity = x is considered.
     """
     dirname = 'Data-{0}-{1}-egram-activity'.format(params['d'], params['e'])
-    nu = 0.13
-    realisations = 40
 
     try:
         data = pickle.load(open(dirname + '/prob-trans-curve-{0}-{1}'.format(nu, realisations), "r"))
         prob_attr_1 = data[0]
         prob_attr_2 = data[1]
+        
     except:
         xs = [210, 211, 212, 213, 214,
               215, 216, 217, 218, 219,
@@ -270,8 +263,9 @@ def plot_prob_vs_x():
 
         prob_attr_1 = []
         prob_attr_2 = []
+
         for x in xs:
-            print "Generating data for {0}/{1}".format(x,xs[-1])
+            print "Generating data for {0}/{1}".format(xs.index(x),len(xs))
             P1 = []
             P2 = []
             for i in range(0,realisations):
@@ -286,11 +280,11 @@ def plot_prob_vs_x():
             if P2 != []:
                 prob_attr_2.extend( [(float(np.sum(P2))/len(P2), x)] )
 
-        with open(dirname + '/prob-trans-curve-{0}-{1}'.format(nu, realisations) + suffix,'w') as fh:
+        with open(dirname + '/prob-trans-curve-{0}-{1}'.format(nu, realisations),'w') as fh:
             pickle.dump(np.array([prob_attr_1, prob_attr_2]), fh)
 
-    print "prob_attr_1: {0}".format(prob_attr_1)
-    print "prob_attr_2: {0}".format(prob_attr_2) 
+    # print "prob_attr_1: {0}".format(prob_attr_1)
+    # print "prob_attr_2: {0}".format(prob_attr_2) 
 
     plt.plot( [j for (i,j) in prob_attr_1], [i for (i,j) in prob_attr_1], 'bo-', label = 'P1')  
     plt.plot( [j for (i,j) in prob_attr_2], [i for (i,j) in prob_attr_2] ,'ro-', label = 'P2')
@@ -322,4 +316,4 @@ if __name__ == "__main__":
     # risk_curve_data_generator()
     # risk_curve_plot()
     # plot_activity(nu = 0.075, i = 1)
-    # plot_prob_vs_x(data_type = 2)
+    # plot_prob_vs_x()
