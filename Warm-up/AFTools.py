@@ -1,3 +1,5 @@
+import numpy as np
+
 class TotalActivity:
 
     """Records number of activated cells at each time step."""
