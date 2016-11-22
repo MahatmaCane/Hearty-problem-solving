@@ -72,8 +72,8 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
     if out_dir is not False:
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
-        egram = TotalActivity()
-        egram.record(0, myocardium.number_of_active_cells())
+        total_activity = TotalActivity()
+        total_activity.record(myocardium.number_of_active_cells())
 
     for time in tt:
         if out_dir is not False:
@@ -95,15 +95,15 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
             plt.pause(0.0001)
 
         if out_dir is not False:
-            egram.record(time, myocardium.number_of_active_cells())
+            total_activity.record(myocardium.number_of_active_cells())
 
     if out_dir is not False:
         with open(out_dir + '/Run-{0}'.format(nu),'w') as fh:
-            pickle.dump(np.array([egram.time, egram.activity]), fh)
+            pickle.dump(np.array(total_activity.activity), fh)
             
     if plot_egram == True:
         fig = plt.figure(2)
-        plt.scatter(egram.time, egram.activity)
+        plt.scatter(egram.activity)
         plt.title('Total Cell Activity')
         plt.show()
 
