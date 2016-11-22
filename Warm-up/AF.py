@@ -8,6 +8,7 @@ import os
 import pickle
 import time
 
+from AFTools import TotalActivity, TimeTracker, Ablater
 from AFModel import Myocardium
 
 def state_pickler(out_dir, myocardium, random_state, t): 
@@ -71,7 +72,7 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
     if out_dir is not False:
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
-        egram = Electrogram()
+        egram = TotalActivity()
         egram.record(0, myocardium.number_of_active_cells())
 
     for time in tt:
