@@ -17,9 +17,8 @@ def state_pickler(out_dir, myocardium, random_state, t):
     with open(out_dir + '/State-{0}-{1}'.format(myocardium._nu, t), 'w') as fh:
         pickle.dump(info, fh)
 
-
 def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
-        e=0.05, ref_period=50, animate=True, out_dir=False, plot_egram=False,
+        e=0.05, ref_period=50, animate=True, out_dir=False, plot_total_activity=False,
         pickle_frequency=None, state_file=None):
 
     args = {'heart rate':heart_rate, 'epsilon':e, 'delta':d, 'tmax':tmax, 
@@ -72,8 +71,8 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
     if out_dir is not False:
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
-        egram = TotalActivity()
-        egram.record(0, myocardium.number_of_active_cells())
+        total_activity = TotalActivity()
+        total_activity.record(0, myocardium.number_of_active_cells())
 
     for time in tt:
         if out_dir is not False:
@@ -95,15 +94,15 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
             plt.pause(0.0001)
 
         if out_dir is not False:
-            egram.record(time, myocardium.number_of_active_cells())
+            total_activity.record(time, myocardium.number_of_active_cells())
 
     if out_dir is not False:
         with open(out_dir + '/Run-{0}'.format(nu),'w') as fh:
-            pickle.dump(np.array([egram.time, egram.activity]), fh)
+            pickle.dump(np.array([total_activity.time, total_activity.activity]), fh)
             
-    if plot_egram == True:
+    if plot_total_activity == True:
         fig = plt.figure(2)
-        plt.scatter(egram.time, egram.activity)
+        plt.scatter(total_activity.time, total_activity.activity)
         plt.title('Total Cell Activity')
         plt.show()
 
@@ -123,7 +122,7 @@ if __name__ == "__main__":
                         help='Animation switch for live animation.')
     parser.add_argument('--out_dir', '-o', type=str, default=False,
                         help='Output directory for data dumping.')
-    parser.add_argument('--plot_egram', '-p', action='store_true',
+    parser.add_argument('--plot_total_activity', '-p', action='store_true',
                         help="""Switch for plotting electrogram activity\n 
                               against time.""")
     parser.add_argument('--pickle_frequency', '-f', type=int, default=None,
