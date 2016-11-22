@@ -91,4 +91,4 @@ class Myocardium:
         """Return Myocardium to resting state everywhere."""
 
         self.counts_until_relaxed[:, :] = 0
-        self.wavefront[:,:] = False
+        self.wavefront[:, :] = False
