@@ -5,7 +5,7 @@ import os
 import pickle
 import matplotlib.pyplot as plt
 from AFModel import Myocardium
-from AFTools import TimeTracker
+from AFTools import TimeTracker, TotalActivity
 
 params = dict(realisations = 60, tmax = 10e4, heart_rate = 250, 
         tissue_shape = (200,200), nu = 0.25, d = 0.05, e = 0.05, 
