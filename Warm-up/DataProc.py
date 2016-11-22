@@ -10,18 +10,6 @@ params = dict(realisations = 60, tmax = 10e4, heart_rate = 250,
         tissue_shape = (200,200), nu = 0.25, d = 0.05, e = 0.05, 
         refractory_period = 50)
 
-class TotalActivity:
-
-    """Records number of activated cells at each time step."""
-
-    def __init__(self):
-        self.activity = []
-        self.time = []
-
-    def record(self, time, activity):
-        self.time.append(time)
-        self.activity.append(activity)
-
 ######### RISK CURVE ##############
 
 def risk_curve_data_generator():
@@ -185,73 +173,6 @@ def risk_curve_plot():
 ###################################
 
 ########## INVESTIGATING ATTRACTOR DYNAMICS ############
-
-def probability_of_state_transition_type1(activity, x):
-    """ For times when activity is equal to a given value, A = x, and when the dynamics proceeds to enter an attractor,
-        this function generates a probability list (0s and 1s) for both the probability of the system evolving to 
-        attractor 1 (associated with sinus rhythm) and to attractor 2 (associated with AF)."""
-    
-    ###### These are given by eye for now, if the method is promising then we'll define functions to determine these accurately #####
-    # low_bound_attractor_1 = None
-    high_bound_attractor_1 = 210
-    low_bound_attractor_2 = 700
-    # high_bound_attractor_2 = None
-
-    def transition_to_attractor_2(t):
-        """Assuming start time t, returns at what later time the system has entered attractor 2. """
-        for i in range(t, len(activity[0])):
-            if activity[0][i] >= low_bound_attractor_2:
-                return i
-            if i+1 == len(activity[0]):
-                raise IndexError        #Simulation terminates in before transitioning to attractor 2.
-   
-    def transition_to_attractor_1(t):
-        """Assuming start time t, returns at what later time the system has entered attractor 1. """
-        for i in range(t, len(activity[0])):
-            if activity[0][i] <= high_bound_attractor_1:
-                return i
-            if i+1 == len(activity[0]):
-                raise IndexError        #Simulation terminates in before transitioning to attractor 2
-
-    t0 = []
-    # Generating a list of (activity == x, time at activity == x) tuple pairs,
-    for i in range(0, len(activity[0])): 
-        if activity[0][i] == x:
-            t0.extend( [(activity[0][i], i)] )
-
-    # Probability that the system enters attractor 1 or 2, starting at A = x,
-    P1 = []
-    P2 = []        
-
-    # print t0
-    if t0 != []:
-        for (j,t) in t0:
-            try:
-                att1 = transition_to_attractor_1(t)
-                att2 = transition_to_attractor_2(t)
-                # Deciding which attractor is entered first,
-                if att2 < att1:
-                    P1.extend([0])
-                    P2.extend([1])
-                elif att1 < att2:
-                    P1.extend([1])
-                    P2.extend([0])
-            except IndexError:
-                # From time t, either system only enters one of the attractors or it enters neither,
-                try:
-                    att1 = transition_to_attractor_1(t)
-                    P1.extend([1])
-                    P2.extend([0])
-                except IndexError:
-                    # System doesn't transition to attractor 1, meaning it either transitions to attractor 2 or neither, 
-                    try:
-                        att2 = transition_to_attractor_2(t)
-                        P1.extend([0])
-                        P2.extend([1])
-                    except IndexError:
-                        pass    # Discard this value of x as not enough time elapsed for system to reach attractor.
-
-    return P1, P2
 
 def probability_of_state_transition_type2(activity, x):
     """ For the first time when activity is equal to a given value, A = x, and when the dynamics proceeds to enter an attractor,
