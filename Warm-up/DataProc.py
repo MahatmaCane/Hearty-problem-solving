@@ -34,14 +34,14 @@ def risk_curve_data_generator():
                                     params['e'], params['refractory_period'])
             egram = TotalActivity()
             tt = TimeTracker(params['tmax'])
-            egram.record(0, myocardium.number_of_active_cells())
+            egram.record(myocardium.number_of_active_cells())
 
             for time in tt:
                 if time%params['heart_rate'] == 0:
                     myocardium.evolve(pulse=True)
                 else:
                     myocardium.evolve()
-                egram.record(time, myocardium.number_of_active_cells())
+                egram.record(myocardium.number_of_active_cells())
 
 
             with open(dirname + '/Run-{0}-{1}-{2}'.format(params['tmax'], nu, i),'w') as fh:
