@@ -117,7 +117,7 @@ if __name__ == "__main__":
                         help='Fraction of existing lateral couplings.')
     parser.add_argument('--delta', '-d', type=float, default=0.05,
                         help='Fraction of defective cells.')
-    parser.add_argument('--epsilon', '-e', type=float, default=0.95,
+    parser.add_argument('--epsilon', '-e', type=float, default=0.05,
                         help='Probability that defective cell fails to fire.')
     parser.add_argument('--animate', '-a', action='store_true', 
                         help='Animation switch for live animation.')
