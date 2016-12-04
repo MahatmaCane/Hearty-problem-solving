@@ -10,11 +10,8 @@ class Basin:
     def __init__(self, data, percentile, offset=0):
 
         """data:       1D array of mean time in configs with activity A.
-           percentile: about maximum value in data. Not in normalised form
-                       such that bounds are at (MAX - Pl, MAX + Pu) where
-                       MAX is the location of maximum and Pl, Pu are found by
-                       requiring percentile of the data lie in the range
-                       [MAX - Pl, MAX + Pu]."""
+           percentile: percentage of data to be included when defining the
+                       width. Not in normalised form (i.e. max value 100)."""
 
         self.offset = offset
         self.bounds = self.__get_bounds(data, percentile)
@@ -63,7 +60,7 @@ class Averager:
         self.avgd_data /= norm_const
 
 
-def prepare_axes(ax, title=None, xlabel=None, ylabel=None):
+def __prepare_axes(ax, title=None, xlabel=None, ylabel=None):
 
     ax.grid()
     if title is not None:
@@ -103,7 +100,7 @@ def basins_same_axes(files, nu, avg=False):
     cmap = plt.get_cmap('rainbow')
 
     y_label = "$Fraction\ of\ time\ in\ configurations\ with\ activity\ A$"
-    ax = prepare_axes(ax, title=r"$\nu={0}$".format(nu), ylabel=y_label)
+    ax = __prepare_axes(ax, title=r"$\nu={0}$".format(nu), ylabel=y_label)
 
     i = 1
     averager = Averager()
@@ -123,7 +120,7 @@ def basins_same_axes(files, nu, avg=False):
     y_label = "$Mean\ fraction\ of\ time\ in\ config's\ with\ activity\ A$"
     if avg is True:
         averager.normalise(i)
-        avg_ax = prepare_axes(avg_ax, xlabel="$Activity\ A$", ylabel=y_label)
+        avg_ax = __prepare_axes(avg_ax, xlabel="$Activity\ A$", ylabel=y_label)
         avg_ax.plot(averager.avgd_data)
 
     plt.show(block=False)
@@ -165,16 +162,29 @@ def determine_basin_boundaries(fname, region, percentile=68.3):
         data = pickle.load(fh)
 
     selected_data = data[region]
-    fib_attractor = Basin(selected_data, percentile, offset=region.start)
+    basin = Basin(selected_data, percentile, offset=region.start)
 
-    print fib_attractor
-    return fib_attractor
+    print basin
+    return basin
+
+
+def prob_enter_basin(path_to_file, basin):
+
+    """Determine probability that myocardium enters fibrillatory attractor
+       given an instantaneous activity x.
+       
+       Input:
+            - path_to_file, """
+
+    with open(path_to_file, 'r') as fh:
+        time_act = pickle.load(fh)
+
 
 def plot_activity(files):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax = prepare_axes(ax)
+    ax = __prepare_axes(ax)
 
     for fname in glob.glob(files):
         with open(fname, 'r') as fh:
@@ -195,7 +205,7 @@ def plot_next_activity(fname):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax = prepare_axes(ax) 
+    ax = __prepare_axes(ax) 
 
     with open(fname, 'r') as fh:
         time_act = pickle.load(fh)
