@@ -17,7 +17,7 @@ def state_pickler(out_dir, myocardium, random_state, t):
     with open(out_dir + '/State-{0}-{1}'.format(myocardium._nu, t), 'w') as fh:
         pickle.dump(info, fh)
 
-def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
+def run(tmax=10e4, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
         e=0.05, ref_period=50, animate=True, out_dir=False, plot_total_activity=False,
         pickle_frequency=None, state_file=None):
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
                         help='Fraction of existing lateral couplings.')
     parser.add_argument('--delta', '-d', type=float, default=0.05,
                         help='Fraction of defective cells.')
-    parser.add_argument('--epsilon', '-e', type=float, default=0.95,
+    parser.add_argument('--epsilon', '-e', type=float, default=0.05,
                         help='Probability that defective cell fails to fire.')
     parser.add_argument('--animate', '-a', action='store_true', 
                         help='Animation switch for live animation.')
