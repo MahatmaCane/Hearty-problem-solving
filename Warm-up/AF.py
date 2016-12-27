@@ -8,14 +8,8 @@ import os
 import pickle
 import time
 
-from AFTools import TotalActivity, TimeTracker, Ablater
+from AFTools import Ablater, StatePickler, TotalActivity, TimeTracker
 from AFModel import Myocardium
-
-def state_pickler(out_dir, myocardium, random_state, t): 
-
-    info = {'myo':myocardium, 'rand_state':random_state, 'time':t}
-    with open(out_dir + '/State-{0}-{1}'.format(myocardium._nu, t), 'w') as fh:
-        pickle.dump(info, fh)
 
 
 def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
@@ -80,7 +74,8 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
             if pickle_frequency is not None:
                 if time%pickle_frequency == 0:
                    rand_state = np.random.get_state()
-                   state_pickler(out_dir, myocardium, rand_state, time)
+                   StatePickler().pickle_state(out_dir, myocardium,
+                                               rand_state, time)
 
         if time%heart_rate == 0:
             myocardium.evolve(pulse=True)
