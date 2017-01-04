@@ -92,3 +92,18 @@ class Myocardium:
 
         self.counts_until_relaxed[:, :] = 0
         self.wavefront[:, :] = False
+
+    def age_tissue(self, nu, target_nu):
+
+        """Remove lateral couplings stochastically until nu is reduced to target nu."""
+
+        #This function is stochastic, since nu is initially determined probabilistically, the reduction of nu also must be
+        #determined probabilistically.
+
+        perc_to_keep = float(target_nu)/nu    #percentage of lateral couplings to retain.
+        perc_to_del = 1 - perc_to_keep
+        random = np.random.random(self.shape) #All values randomly between 0 & 1
+        # Let elements of self.lateral_couplings be random numbers between 0 & 1, then keep 'perc_to_keep' of them, setting them to 1, and set the rest to 0.
+        self.lateral_couplings = self.lateral_couplings * random >= perc_to_del
+        self._nu = target_nu
+        
