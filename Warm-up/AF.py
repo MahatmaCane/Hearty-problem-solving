@@ -11,13 +11,7 @@ import time
 from AFTools import TotalActivity, TimeTracker, Ablater
 from AFModel import Myocardium
 
-def state_pickler(out_dir, myocardium, random_state, t): 
-
-    info = {'myo':myocardium, 'rand_state':random_state, 'time':t}
-    with open(out_dir + '/State-{0}-{1}'.format(myocardium._nu, t), 'w') as fh:
-        pickle.dump(info, fh)
-
-def run(tmax=10e4, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
+def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
         e=0.05, ref_period=50, animate=True, out_dir=False, plot_total_activity=False,
         pickle_frequency=None, state_file=None):
 
@@ -102,7 +96,7 @@ def run(tmax=10e4, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
             
     if plot_total_activity == True:
         fig = plt.figure(2)
-        plt.scatter(egram.activity)
+        plt.plot([i for i in range(0, len(total_activity.activity))], total_activity.activity, '-')
         plt.title('Total Cell Activity')
         plt.show()
 
@@ -112,15 +106,15 @@ if __name__ == "__main__":
 
     parser.add_argument('--shape', '-s', type=int, default=200,
                         help='Myocardium dimensions.')
-    parser.add_argument('--nu', '-n', type=float, default=0.21,
+    parser.add_argument('--nu', '-n', type=float, default=0.1,
                         help='Fraction of existing lateral couplings.')
-    parser.add_argument('--delta', '-d', type=float, default=0.05,
+    parser.add_argument('--delta', '-d', type=float, default=0.01,
                         help='Fraction of defective cells.')
     parser.add_argument('--epsilon', '-e', type=float, default=0.05,
                         help='Probability that defective cell fails to fire.')
     parser.add_argument('--animate', '-a', action='store_true', 
                         help='Animation switch for live animation.')
-    parser.add_argument('--out_dir', '-o', type=str, default=False,
+    parser.add_argument('--out_dir', '-o', type=str, default='egramfile',
                         help='Output directory for data dumping.')
     parser.add_argument('--plot_total_activity', '-p', action='store_true',
                         help="""Switch for plotting electrogram activity\n 
@@ -132,6 +126,6 @@ if __name__ == "__main__":
                         help='Pickle file containing pickled myocardium.')
     args = parser.parse_args()
 
-    run(nu=args.nu, d=args.delta, e=args.epsilon, animate=args.animate,
-        tissue_shape=(200, args.shape), out_dir=args.out_dir,
+    run(tmax = 10e3, nu=args.nu, d=args.delta, e=args.epsilon, animate=args.animate,
+        tissue_shape=(200, args.shape), out_dir=args.out_dir, plot_total_activity=True,
         pickle_frequency=args.pickle_frequency, state_file=args.state_file)
