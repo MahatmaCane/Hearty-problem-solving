@@ -8,7 +8,7 @@ import os
 import pickle
 import time
 
-from AFTools import Ablater, StatePickler, TotalActivity, TimeTracker
+from AFTools import (Ablater, Loader, StatePickler, TotalActivity, TimeTracker)
 from AFModel import Myocardium
 
 
@@ -16,12 +16,33 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
         e=0.05, ref_period=50, animate=True, out_dir=False, plot_egram=False,
         pickle_frequency=None, state_file=None):
 
+    """Run simulation.
+    
+    Input:
+        - tmax:             Total number of time steps. Integer.
+        - heart_rate:       Beat period. Integer.
+        - tissue_shape:     Dimensions of 2D array. Tuple.
+        - nu:               Fraction of possible lateral couplings present. 
+                            Float <= 1.
+        - d:                Fraction of cells which are defective. Float <= 1.
+        - e:                Probability that defective cell doesn't excite given
+                            stimulus.
+        - ref_period:       Refractory period of cells. Integer.
+        - animate:          Switch for animation. Bool.
+        - out_dir:          Output directory for data-dumping. If False, no
+                            data-dumping occurs.
+        - plot_egram:       Switch for plotting activity vs. time at the end of
+                            simulation. Bool.
+        - pickle_frequency: Integer. Pickle myocardium and state of numpy random
+                            number generator after every pickle_frequency time steps.
+        - state_file:       Path to file containing desired initial state of the 
+                            myocardium and numpy RNG. String."""
+
     args = {'heart rate':heart_rate, 'epsilon':e, 'delta':d, 'tmax':tmax, 
             'tau':ref_period, 'nu':nu, 'shape':tissue_shape}
 
     if state_file is not None:
-        with open(state_file, 'r') as fh:
-            state_dict = pickle.load(fh)
+        state_dict = StateLoader(state_file)
         myocardium = state_dict['myo']
         np.random.set_state(state_dict['rand_state'])
         tt = TimeTracker(tinit=state_dict['time'], tmax=tmax)
