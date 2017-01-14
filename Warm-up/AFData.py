@@ -108,6 +108,7 @@ def basins_same_axes(files, nu, avg=False):
 
         with open(fname, 'r') as fh:
             time_act = pickle.load(fh)
+            activity = time_act
             time_at_activity = find_time_at_activity(time_act)
             all_activity_vals = np.arange(np.max(activity)+1)
             ax.plot(all_activity_vals, time_at_activity, '-',
