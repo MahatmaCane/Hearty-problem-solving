@@ -107,8 +107,8 @@ def basins_same_axes(files, nu, avg=False):
     for fname in glob.glob(files):
 
         with open(fname, 'r') as fh:
-            time_act = pickle.load(fh)
-            time_at_activity = find_time_at_activity(time_act)
+            activity = pickle.load(fh)
+            time_at_activity = find_time_at_activity(activity)
             all_activity_vals = np.arange(np.max(activity)+1)
             ax.plot(all_activity_vals, time_at_activity, '-',
                     c=cmap(1.*i/num_colours))
