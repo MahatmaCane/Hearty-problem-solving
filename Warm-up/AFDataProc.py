@@ -25,9 +25,10 @@ def enters_fib(t, activity, threshold):
 
 def leaves_fib(t, activity, threshold):
     """ Returns time at which the system first leaves fibrillation from time t to time tmax,
-        unless the system does not leave fibrillation, then an IndexError is raised."""
+        unless the system does not leave fibrillation, then an IndexError is raised,
+        unless the system enters fibrillation within the final 2 heartbeats, then a ValueError is raised."""
 
-    if t > params['tmax'] - params['heart_rate']:
+    if t > params['tmax'] - 2*params['heart_rate']: #Sim enters fib within the final 2 heartbeats and so has no time to leave.
         raise ValueError
 
     heart_beat_times = [j for j in range(0,len(activity)) if j%params['heart_rate'] == 0]
@@ -46,13 +47,10 @@ def leaves_fib(t, activity, threshold):
             if activity[i+params['heart_rate']] <= threshold:
                 # An additional constraint on defining sinus rhythm. The average activity is less than the width of the myocardium
                 # since the heartbeat is longer (250 > 200), i.e. there will be a period in sinus rhythm where there is 0 activity.
-                if activity[i-1:i-1+params['heart_rate']] == []:
-                    print "For i = %i and t = %i, EMPTY SLICE"%(i,t)
-                    continue
                 if np.mean(activity[i-1:i-1+params['heart_rate']]) <= params['tissue_shape'][0]:  
                     return i
-        if i == test_activities[-2]:  #Not sure why it doesn't reach [-1]???
-            raise IndexError # Simulation Terminated in Fibrillatory state
+        if i == test_activities[-2]:
+            raise IndexError # Simulation terminated in fibrillatory state (Takes two heartbeats to return to sinus rhythm)
 
 def cross_boundary(t, activity, boundary, cross_from = 'below'):
     """ Returns time at which the system first crosses boundary (from below or above) from time 
@@ -204,6 +202,43 @@ def risk_curve_plot():
     plt.legend()
     plt.show()
 
+def patient_specific_risk_curve_data(patient = 'A'):
+    nus = [0.11, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05]
+
+    dirname = 'Risk-Curve-Patient-{3}-{0}-{1}-{2}'.format(params['d'], params['e'], params['tmax'], patient)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
+    myocardium = Myocardium(params['tissue_shape'], nu, params['d'], 
+                            params['e'], params['refractory_period'])
+
+    for nu in nus:
+        time_in_AF = []
+        for i in range(0,params['realisations']):
+
+            total_activity = TotalActivity()
+            tt = TimeTracker(params['tmax'])
+            total_activity.record(myocardium.number_of_active_cells())
+
+            for time in tt:
+                if time%params['heart_rate'] == 0:
+                    myocardium.evolve(pulse=True)
+                else:
+                    myocardium.evolve()
+                total_activity.record(myocardium.number_of_active_cells())
+
+
+            with open(dirname + '/Run-{0}-nu-{1}'.format(i, nu),'w') as fh:
+                pickle.dump(np.array(total_activity.activity), fh)
+            myocardium.reset()
+
+        if nu != nus[-1]:
+            myocardium.age_tissue(nu, nus[nus.index(nu) + 1])
+
+    with open(dirname + '/Nus-{0}'.format(params['tmax']),'w') as fh:
+        pickle.dump(np.array(nus), fh)
+
+
 ################# INVESTIGATING ATTRACTOR DYNAMICS ###############
 
 def generate_single_substrate_data(nu):
@@ -233,7 +268,6 @@ def generate_single_substrate_data(nu):
             pickle.dump(total_activity.activity, fh)
         myocardium.reset()
 
-# Is there a way to save the initial myocardium, so that once this function has been run, one could go back and generate more data for other nus?
 def generate_single_substrate_data_aging_tissue(nus):
 
     dirname = 'Single-Substrate-tmax-{0}-d-{1}'.format(params['tmax'], params['d'])
@@ -270,7 +304,7 @@ def generate_single_substrate_data_aging_tissue(nus):
         if nu != nus[-1]:
             myocardium.age_tissue(nu, nus[nus.index(nu) + 1])
 
-# May need to rethink this function - want to plot multiple basins of attraction plots but for on substrate with multiple nus (mimicking aging tissue)
+# Need to rethink this function - want to plot multiple basins of attraction plots but for one substrate with multiple nus (mimicking aging tissue)
 def plot_basins_of_attraction(files, nu, avg=False):
     """ Plot multiple realisations at a given nu on the same axis. """
 
@@ -682,11 +716,10 @@ def plot_next_activity(fname):
 if __name__ == "__main__":
     # generate_risk_curve_data()
        
-    nus = [0.11, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05]       
-    plot_multiple_survival_curves(nus)
-
-    # nus = [0.11, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05]
+    nus = [0.11, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05]
     # generate_single_substrate_data_aging_tissue(nus)
+
+    plot_multiple_survival_curves(nus)
 
     # plot_basins_of_attraction('./Single-Substrate-tmax-100000.0-d-0.01/SS-nu-0.09-Run-*', nu = 0.09, avg = True)
     

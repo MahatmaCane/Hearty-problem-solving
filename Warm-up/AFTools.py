@@ -77,3 +77,11 @@ class StatePickler:
         info = {'myo':myocardium, 'rand_state':random_state, 'time':t}
         with open(out_dir + '/State-{0}-{1}'.format(myocardium._nu, t), 'w') as fh:
             pickle.dump(info, fh)
+
+class Loader:
+
+    def init(self, path_to_file):
+
+        with open(path_to_file, 'r') as fh:
+            file_contents = pickle.load(fh)
+        return file_contents
