@@ -96,7 +96,7 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
             
     if plot_total_activity == True:
         fig = plt.figure(2)
-        plt.plot([i for i in range(0, len(total_activity.activity))], total_activity.activity, '-')
+        plt.plot(total_activity.activity, '-')
         plt.title('Total Cell Activity')
         plt.show()
 
