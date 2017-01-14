@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 
 class TotalActivity:
 
@@ -42,6 +43,17 @@ class TimeTracker:
     def stop(self):
 
         self.stop = True
+
+def prepare_axes(ax, title=None, xlabel=None, ylabel=None):
+
+    ax.grid()
+    if title is not None:
+        ax.set_title(title)
+    if not (xlabel is None):
+        ax.set_xlabel(xlabel)
+    if not (ylabel is None):
+        ax.set_ylabel(ylabel)
+    return ax
 
 class StatePickler:
 
