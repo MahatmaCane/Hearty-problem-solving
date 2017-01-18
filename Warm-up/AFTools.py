@@ -80,7 +80,7 @@ class StatePickler:
 
 class Loader:
 
-    def init(self, path_to_file):
+    def __init__(self, path_to_file):
 
         with open(path_to_file, 'r') as fh:
             file_contents = pickle.load(fh)
