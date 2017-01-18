@@ -83,4 +83,4 @@ class Loader:
     def __init__(self, path_to_file):
 
         with open(path_to_file, 'r') as fh:
-            self.file_contents = pickle.load(fh)
+            self.contents = pickle.load(fh)
