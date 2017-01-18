@@ -1,4 +1,10 @@
-#print activity lists at each nu to see wagwan famalam
+# When generating the whole data set for a given patient, remember that any change in the initial data set from 
+# simulate_patient will require DELETING and recreating the data for subsequent functions such as patient_specific_risk_curve,
+# basins_of_attraction_plot, flickering and survival_curves_plot.
+
+# TO DO:
+# Generate all data for given patient to test each function works.
+# When threshold is defined, test Loader class to generate survival curve near threshold for dense list of nus. 
 
 import numpy as np
 import os
@@ -6,13 +12,15 @@ import glob
 import pickle
 import matplotlib.pyplot as plt
 from AFModel import Myocardium
-from AFTools import TimeTracker, TotalActivity, prepare_axes, StatePickler
+from AFTools import TimeTracker, TotalActivity, prepare_axes, StatePickler, Loader
 
 params = dict(realisations = 60, tmax = 10e4, heart_rate = 250, 
-              tissue_shape = (200,200), nu = 0.25, d = 0.01, e = 0.05, 
+              tissue_shape = (200,200), d = 0.01, e = 0.05, 
               refractory_period = 50)
 
-##### Generic functions used throughout ####
+patient_initial_nus = [0.11, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05] #Initial values of nu to generate patient-specific risk curve data - to be determined from generic_model_risk_curve.
+
+#### Generic Functions Used Throughout ####
 
 def enters_fib(t, activity, threshold):
     """ Returns time at which the system first enters fibrillation from time t to time tmax,
@@ -70,47 +78,6 @@ def cross_boundary(t, activity, boundary, cross_from = 'below'):
             if i+1 ==len(activity):
                 raise IndexError
 
-################# RISK CURVE ######################
-
-def generate_risk_curve_data():
-    """ Generates the total_activity lists for each realisation of each nu, and saves them
-        to a folder with appropriate file names. Saves the list of nus used."""
-
-    nus = [0.02, 0.04, 0.06, 0.08, 0.11, 
-           0.13, 0.15, 0.17, 0.19, 0.21, 
-           0.23, 0.25, 0.27, 0.29, 0.12, 
-           0.14, 0.16, 0.18, 0.2, 0.22, 
-           0.24, 0.26, 0.28, 0.3, 0.1]
-
-    dirname = 'Risk-Curve-{0}-{1}-{2}'.format(params['d'], params['e'], params['tmax'])
-    if not os.path.exists(dirname):
-        os.makedirs(dirname)
-
-    for nu in nus:
-        time_in_AF = []
-        for i in range(0,params['realisations']):
-
-            myocardium = Myocardium(params['tissue_shape'], nu, params['d'], 
-                                    params['e'], params['refractory_period'])
-            total_activity = TotalActivity()
-            tt = TimeTracker(params['tmax'])
-            total_activity.record(myocardium.number_of_active_cells())
-
-            for time in tt:
-                if time%params['heart_rate'] == 0:
-                    myocardium.evolve(pulse=True)
-                else:
-                    myocardium.evolve()
-                total_activity.record(myocardium.number_of_active_cells())
-
-
-            with open(dirname + '/Run-{0}-nu-{1}'.format(i, nu),'w') as fh:
-                pickle.dump(np.array(total_activity.activity), fh)
-            # print "Run {0}/{1} saved for nu = {2}.".format(i+1, params['realisations'], nu)
-
-    with open(dirname + '/Nus-{0}'.format(params['tmax']),'w') as fh:
-        pickle.dump(np.array(nus), fh)
-
 def mean_time_fibrillating(activity):
     a = 0
     entersfib = []
@@ -150,28 +117,111 @@ def mean_time_fibrillating(activity):
 
     return np.mean(is_fibrillating)
 
-def risk_curve_plot():
+def simulate_patient(patient = 'A', nus = patient_initial_nus, load_from_first_nu_in_nus = False):
+	"""
+    This function runs a patient specific simulation, logging the total activity for each realisation.
+    It is imperative to ensure that any data associated with aging tissue is created in one batch, unless
+    the state of the myocardium at a given nu is loaded, then each subsequent (decreased) nu value must
+    have the data recreated for it.  
+	"""
 
-    dirname = 'Risk-Curve-{0}-{1}-{2}'.format(params['d'], params['e'], params['tmax'])
-    nus = pickle.load(open(dirname + '/Nus-{0}'.format(params['tmax']), "r"))
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
 
-    mean_time_in_AF = []
-    std_devs = []
+    sp = StatePickler()
+    tt = TimeTracker(tmax=params['tmax'])
+    runner = TimeTracker(tmax=params['realisations'])
+   
+    if load_from_first_nu_in_nus == False:
+        myocardium = Myocardium(params['tissue_shape'], nus[0], params['d'], 
+                                params['e'], params['refractory_period'])
+
+    elif load_from_first_nu_in_nus == True:
+        myocardium = Loader(path_to_file = dirname + '/State-{0}-{1}'.format(myocardium._nu, 0)).contents()
+        nus = nus[1:]
 
     for nu in nus:
-        time_in_AF = []
 
-        for i in range(0, params['realisations']):
-            try:
-                activity = pickle.load(open(dirname + '/Run-{0}-nu-{1}'.format(i, nu), "r"))
-                # is_fibrillating = np.array(activity) >= (params['tissue_shape'][0]+0.05*params['tissue_shape'][0])
-                # time_in_AF.append(float(np.sum(is_fibrillating))/ params['tmax'])
-                mean_time_in_fib = mean_time_fibrillating(activity)
-                time_in_AF.append(mean_time_in_fib)
-            except:
-                Exception("Data for realisation %i does not exist"%(i))
-        mean_time_in_AF.append(np.mean(time_in_AF))
-        std_devs.append(np.std(time_in_AF))
+        sp.pickle_state(out_dir = dirname, myocardium = myocardium, 
+                        random_state = np.random.get_state(), t=0) 
+
+        for i in runner:
+            print "Beginning simulation number {0} for nu = {1}".format(i, nu)
+            total_activity = TotalActivity()
+            file_name = "/sim-patient-{2}-nu-{1}-Run-{0}".format(i, nu, patient)
+            for time in tt:
+                if time%params['heart_rate'] == 0:
+                    myocardium.evolve(pulse=True)
+                else:
+                    myocardium.evolve()
+                activity = myocardium.number_of_active_cells()
+                total_activity.record(activity)
+            with open(dirname + file_name, 'w') as fh:
+                pickle.dump(total_activity.activity, fh)
+            myocardium.reset()
+        if nu != nus[-1]:
+            myocardium.age_tissue(nu, nus[nus.index(nu) + 1])
+
+#### Determining Critical Threshold - Risk Curve ####
+
+def generic_model_risk_curve():
+    """ Generates the total_activity lists for each realisation of each nu, and saves them
+        to a folder with appropriate file names. Saves the list of nus used."""
+
+    nus = [0.02, 0.04, 0.06, 0.08, 0.11, 
+           0.13, 0.15, 0.17, 0.19, 0.21, 
+           0.23, 0.25, 0.27, 0.29, 0.12, 
+           0.14, 0.16, 0.18, 0.2, 0.22, 
+           0.24, 0.26, 0.28, 0.3, 0.1]
+
+    dirname = 'Generic-Risk-Curve-{0}-{1}-{2}'.format(params['d'], params['e'], params['tmax'])
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
+    try:
+        mean_time_in_AF, std_devs = pickle.load(open(dirname + 'plot_data', 'w'))
+
+    except:
+        mean_time_in_AF = []
+        std_devs = []
+
+        for nu in nus:
+            time_in_AF = []
+
+            for i in range(0, params['realisations']):
+                try:
+                    activity = pickle.load(open(dirname + '/Run-{0}-nu-{1}'.format(i, nu), "r"))
+                    mean_time_in_fib = mean_time_fibrillating(activity)
+                    time_in_AF.append(mean_time_in_fib)
+                except:
+                    print("Data for nu = {0}, realisation {1}, does not exist... generating data".format(nu,i))
+
+                    myocardium = Myocardium(params['tissue_shape'], nu, params['d'], 
+                                            params['e'], params['refractory_period'])
+                    total_activity = TotalActivity()
+                    tt = TimeTracker(params['tmax'])
+                    total_activity.record(myocardium.number_of_active_cells())
+
+                    for time in tt:
+                        if time%params['heart_rate'] == 0:
+                            myocardium.evolve(pulse=True)
+                        else:
+                            myocardium.evolve()
+                        total_activity.record(myocardium.number_of_active_cells())
+
+                    with open(dirname + '/Run-{0}-nu-{1}'.format(i, nu),'w') as fh:
+                        pickle.dump(np.array(total_activity.activity), fh)
+                
+                    activity = pickle.load(open(dirname + '/Run-{0}-nu-{1}'.format(i, nu), "r"))
+                    mean_time_in_fib = mean_time_fibrillating(activity)
+                    time_in_AF.append(mean_time_in_fib)
+
+            mean_time_in_AF.append(np.mean(time_in_AF))
+            std_devs.append(np.std(time_in_AF))
+
+        with open(dirname + 'plot_data', 'w') as fh:
+        	pickle.dump(mean_time_in_AF, std_devs)
 
     kishanNus = [0.02, 0.04, 0.06, 0.08, 0.11, 
                  0.13, 0.15, 0.17, 0.19, 0.21, 
@@ -201,161 +251,259 @@ def risk_curve_plot():
     plt.title('Realisations: {0}'.format(params['realisations']))
     plt.legend()
     plt.show()
+       
+def patient_specific_risk_curve(patient = 'A', nus = patient_initial_nus, plot = True):
+    """
+    Want to generate a risk curve for a given patient with enough data around the threshold.
+    Must first run this function with patient_initial_nus to roughly determine the threshold.
+    Then generate data for a dense set of nus around this threshold using the simulate_patient function.
+    Then run this function with the full set of data calculated, in order to plot an accurate risk curve for given patient.
 
-def patient_specific_risk_curve_data(patient = 'A'):
-    nus = [0.11, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05]
-
-    dirname = 'Risk-Curve-Patient-{3}-{0}-{1}-{2}'.format(params['d'], params['e'], params['tmax'], patient)
-    if not os.path.exists(dirname):
-        os.makedirs(dirname)
-
-    myocardium = Myocardium(params['tissue_shape'], nu, params['d'], 
-                            params['e'], params['refractory_period'])
-
-    for nu in nus:
-        time_in_AF = []
-        for i in range(0,params['realisations']):
-
-            total_activity = TotalActivity()
-            tt = TimeTracker(params['tmax'])
-            total_activity.record(myocardium.number_of_active_cells())
-
-            for time in tt:
-                if time%params['heart_rate'] == 0:
-                    myocardium.evolve(pulse=True)
-                else:
-                    myocardium.evolve()
-                total_activity.record(myocardium.number_of_active_cells())
-
-
-            with open(dirname + '/Run-{0}-nu-{1}'.format(i, nu),'w') as fh:
-                pickle.dump(np.array(total_activity.activity), fh)
-            myocardium.reset()
-
-        if nu != nus[-1]:
-            myocardium.age_tissue(nu, nus[nus.index(nu) + 1])
-
-    with open(dirname + '/Nus-{0}'.format(params['tmax']),'w') as fh:
-        pickle.dump(np.array(nus), fh)
-
-
-################# INVESTIGATING ATTRACTOR DYNAMICS ###############
-
-def generate_single_substrate_data(nu):
-
-    dirname = 'Single-Substrate-tmax-{0}-d-{1}'.format(params['tmax'], params['d'])
-    if not os.path.exists(dirname):
-        os.makedirs(dirname)
-
-    tt = TimeTracker(tmax=params['tmax'])
-    runner = TimeTracker(tmax=params['realisations'])
+    Checks whether the plot has been created before, if so, plots it again by loading the data.
+    If not, creates the plot data. When creating the plot data, checks whether all the necessary
+    simulation data exists. If so, creates the plot. If not, prints message to state which file was missing.
+    """
     
-    myocardium = Myocardium(params['tissue_shape'], nu, params['d'], 
-                            params['e'], params['refractory_period'])
-	
-    for i in runner:
-        print "Beginning simulation number {0}".format(i)
-        total_activity = TotalActivity()
-        file_name = "/SS-nu-{1}-Run-{0}".format(i, nu)
-        for time in tt:
-            if time%params['heart_rate'] == 0:
-                myocardium.evolve(pulse=True)
-            else:
-                myocardium.evolve()
-            activity = myocardium.number_of_active_cells()
-            total_activity.record(activity)
-        with open(dirname + file_name, 'w') as fh:
-            pickle.dump(total_activity.activity, fh)
-        myocardium.reset()
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    subdirname = '/Risk-Curve'
+    if not os.path.exists(dirname+subdirname):
+        os.makedirs(dirname+subdirname)
 
-def generate_single_substrate_data_aging_tissue(nus):
+    try:
+    	mean_time_in_AF, std_devs = pickle.load(open(dirname + subdirname + 'plot_data', 'w'))
 
-    dirname = 'Single-Substrate-tmax-{0}-d-{1}'.format(params['tmax'], params['d'])
-    if not os.path.exists(dirname):
-        os.makedirs(dirname)
+    except:
+        for nu in nus:
+            for i in range(0,params['realisations']):
+                file_name = "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, i)
+                if not os.path.exists(dirname+file_name):
+                    print "Incomplete data set, file_name: {0} does not exist".format(file_name)
+                    return
 
-    sp = StatePickler()
-    tt = TimeTracker(tmax=params['tmax'])
-    runner = TimeTracker(tmax=params['realisations'])
-   
-    myocardium = Myocardium(params['tissue_shape'], nus[0], params['d'], 
-                            params['e'], params['refractory_period'])
+        mean_time_in_AF = []
+        std_devs = []    
 
+        for nu in nus:
+            time_in_AF = []
+
+            for i in range(0, params['realisations']):
+                activity = pickle.load(open(dirname + '/Run-{0}-nu-{1}'.format(i, nu), "r"))
+                mean_time_in_fib = mean_time_fibrillating(activity)
+                time_in_AF.append(mean_time_in_fib)
+
+            mean_time_in_AF.append(np.mean(time_in_AF))
+            std_devs.append(np.std(time_in_AF))
+
+        with open(dirname + 'plot_data', 'w') as fh:
+            pickle.dump(mean_time_in_AF, std_devs)    
+
+    plt.errorbar(nus, mean_time_in_AF, yerr=[i/(params['realisations'])**0.5 for i in std_devs], xerr=None, fmt='x', label = 'Data from us')
+
+    plt.xlabel('Fraction of vertical connections, '+r'$\nu$')
+    plt.ylabel('Mean time in AF/ Risk of AF')
+    plt.title('Realisations: {0}'.format(params['realisations']))
+    plt.legend()
+    plt.show()
+
+#### Bifurcation of States ####
+
+# Define function which loads the data for a given patient, and plots the 'basins of attraction' at each nu.
+
+#### Flickering ####
+
+def mean_frequency_of_episodes(patient = 'A', nu = 1, realisations = params['realisations']):
     
-    for nu in nus:
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    subdirname = '/Flickering-Data'
+    
+    threshold = params['tissue_shape'][0]+0.05*params['tissue_shape'][0]
+    episodes_counted = 0
 
-        sp.pickle_state(out_dir = dirname, myocardium = myocardium, 
-                        random_state = np.random.get_state(), t=0) 
+    for i in range(0, realisations):
+        print "Realisation {0}/{1}".format(i,realisations)
+        try:
+        	file_name = "/sim-patient-{0}-nu-{1}-Run-{0}".format(patient, nu, i)
+            with open(dirname + file_name, "r") as fh:
+                activity = pickle.load(fh)
+        except:
+            print("Data does not exist for; SS-nu-{0}-Run-{1}".format(nu, i))
+            break
 
-        for i in runner:
-            print "Beginning simulation number {0} for nu = {1}".format(i, nu)
-            total_activity = TotalActivity()
-            file_name = "/SS-nu-{1}-Run-{0}".format(i, nu)
-            for time in tt:
-                if time%params['heart_rate'] == 0:
-                    myocardium.evolve(pulse=True)
-                else:
-                    myocardium.evolve()
-                activity = myocardium.number_of_active_cells()
-                total_activity.record(activity)
-            with open(dirname + file_name, 'w') as fh:
-                pickle.dump(total_activity.activity, fh)
-            myocardium.reset()
-        if nu != nus[-1]:
-            myocardium.age_tissue(nu, nus[nus.index(nu) + 1])
+        try:
+            t = 0
+            while True:
+                t_enters = enters_fib(t, activity, threshold)
+                t_leaves = leaves_fib(t_enters, activity, threshold)
 
-# Need to rethink this function - want to plot multiple basins of attraction plots but for one substrate with multiple nus (mimicking aging tissue)
-def plot_basins_of_attraction(files, nu, avg=False):
-    """ Plot multiple realisations at a given nu on the same axis. """
+                if type(t_enters) == type(None):
+                    print "t_enters FAILED"
+                elif type(t_leaves) == type(None):
+                    print "t_leaves FAILED"
 
-    if avg is False:
-        ax = plt.gca()
-        ax.clear()
-    elif avg is True:
-        fig, (ax, avg_ax) = plt.subplots(2, 1, sharex=True)
+                episodes_counted += 1
+                
+                t = t_leaves
 
-    num_colours = len(glob.glob(files))
-    cmap = plt.get_cmap('rainbow')
+        except IndexError:
+            try: 
+                # Simulation terminates in fib.
+                t_enters = enters_fib(t, activity, threshold)
+                episodes_counted += 1
 
-    ax = prepare_axes(ax, title=r"$\nu={0}$".format(nu),
-                      ylabel="$Fraction\ of\ time\ in\ configurations\ with\ activity\ A$")
-
-    i = 1
-    avgs = None
-    for fname in glob.glob(files):
-        print "Working on {0}".format(fname)
-        with open(fname, 'r') as fh:
-            time_act = pickle.load(fh)
-            if isinstance(time_act, list):
-                time_act = np.array(time_act)
-            try:
-                activity = time_act[0, :]
             except IndexError:
-                activity = time_act
-            time_at_activity = np.bincount(activity) / float(activity.size)
-            all_activity_vals = np.arange(np.max(activity)+1)
-            ax.plot(all_activity_vals, time_at_activity, '-',
-                    c=cmap(1.*i/num_colours))
-            if avg is True:
-                if avgs is None:
-                    avgs = time_at_activity
-                else:
-                    if avgs.size < time_at_activity.size:
-                        tmp_avgs = time_at_activity
-                        tmp_avgs[:avgs.size] += avgs
-                        avgs = tmp_avgs
-                    else:
-                        avgs[:time_at_activity.size] += time_at_activity
-        i += 1
+                #Simulation terminates in Sinus rhythm
+                pass
+        except ValueError:
+            #Sim enters fib within last two heartbeats of simulation
+            pass
 
-    if avg is True:
-        avg_ax = prepare_axes(avg_ax, xlabel="$Activity\ A$", 
-                              ylabel="$Average\ fraction\ of\ time\ in\ configurations\ with\ activity\ A$")
-        avg_ax.plot(avgs / i)
+    result = float(episodes_counted)/realisations
+
+    with open(dirname + subdirname + 'nu-{0}-realisations-{1}'.format(nu,realisations), 'w') as fh:
+    	pickle.dump(result, fh)
+
+    return result
+
+def plot_mean_frequency_episodes(patient = 'A', nus = patient_initial_nus, realisations = params['realisations']):
+    
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    subdirname = '/Flickering-Data'
+
+    mean_freqs = []
+
+    for nu in nus:
+    	try:
+            with open(dirname + subdirname +'nu-{0}-realisations-{1}'.format(nu,realisations), 'r') as fh:
+                data = pickle.load(fh)
+            print "Succesfully loaded data for file_name: nu-{0}-realisations-{1}".format(nu,realisations)
+            mean_freqs.append(data)
+        except:
+            print "Generating data for file_name: nu-{0}-realisations-{1}".format(nu,realisations)
+            mean_freqs.append(mean_frequency_of_episodes(patient, nu, realisations))
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax = prepare_axes(ax)   
+
+    ax.scatter(nus, mean_freqs)  
 
     plt.show()
 
-#Want function to compute the boundaries here.
+#### Critical Slowing Down ####
+
+def gen_survival_curve_data(patient = 'A', nu = 1, realisations = params['realisations']):
+	"""
+    Generates and saves the survival curve data for given patient at a given nu.
+	"""
+
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    subdirname = '/Survival-Curve'
+
+    times_spent_in_fib = []
+    episodes_counted = 0
+    threshold = params['tissue_shape'][0]+0.05*params['tissue_shape'][0]
+
+    for i in range(0, realisations):
+        print "Working on realisation: ", i
+        # print("Episodes counted:", episodes_counted)
+        try:
+        	file_name = "/sim-patient-{0}-nu-{1}-Run-{0}".format(patient, nu, i)
+            with open(dirname + file_name, "r") as fh:
+                activity = pickle.load(fh)
+
+        except:
+            print("Data does not exist for file_name: {0}".format(file_name))
+            break
+
+        #Work out (for each realisation) when the system enters and leaves fib.
+        try:
+            t = 0
+            while True:    
+                t_enters = enters_fib(t, activity, threshold)
+                t_leaves = leaves_fib(t_enters, activity, threshold)
+
+                if type(t_enters) == type(None):
+                    print "t_enters FAILED"
+                elif type(t_leaves) == type(None):
+                    print "t_leaves FAILED"
+                dt = t_leaves-t_enters
+
+                # If the list of integers representing the number of times a sim 'survived in fib' isn't 
+                # as long as the new data set of points to be added, extend this list with 0's to be that size. 
+                if len(times_spent_in_fib) < dt:        
+                    a = dt - len(times_spent_in_fib)
+                    for i in range(0, a):
+                        times_spent_in_fib.extend([0])
+
+                # Add 1 to each time 'bin' for each timestep that the sim remained in att.2. 
+                for i in range(0, dt):
+                    times_spent_in_fib[i] += 1
+                episodes_counted += 1
+                
+                t = t_leaves
+
+        except IndexError:
+            try: 
+                # Simulation terminates in fib.
+                t_enters = enters_fib(t, activity, threshold)
+                dt = len(activity) - t_enters                 #Sim ends in fib. so tmax - time it entered can be added to survival curve calc.
+        
+                if len(times_spent_in_fib) < dt:
+                    a = dt - len(times_spent_in_fib)
+                    for i in range(0, a):
+                        times_spent_in_fib.extend([0])
+
+                for i in range(0, dt):
+                    times_spent_in_fib[i] += 1
+                episodes_counted += 1
+            except IndexError:
+                #Simulation terminates in Sinus rhythm
+                pass
+        except ValueError:
+            #Sim enters fib within last two heartbeats of simulation
+            pass
+
+        # Converting times_spent_in_fib to probability list:
+        P = [float(i)/episodes_counted for i in times_spent_in_fib]
+
+        out_loc = dirname + subdirname +'/{0}-{1}'.format(nu, realisations)
+        with open(out_loc, 'w') as fh:
+            pickle.dump(P, fh)
+
+def survival_curves_plot(nus):
+
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    subdirname = '/Survival-Curve'
+    realisations = params['realisations']
+
+    ax = plt.gca()
+    ax = prepare_axes(ax, title = 'Survival Curve', 
+                      ylabel = 'Probability of remaining in fibrillation',
+                      xlabel = 'Time spent in fibrillation')
+    n = len(nus)
+    colour=iter(plt.cm.brg(np.linspace(0,0.9,n)))
+
+    for nu in nus:
+
+        try:
+            with open(dirname + subdirname +'/{0}-{1}'.format(nu, realisations), 'r') as fh:
+                P = pickle.load(fh)
+            print("Succesfully loaded survival curve for nu = ", nu)
+        except:
+            print("Generating survival curve for nu = ", nu)
+            gen_survival_curve_data(nu, realisations)
+            with open(dirname + subdirname +'/{0}-{1}'.format(nu, realisations), 'r') as fh:
+                P = pickle.load(fh)
+        c = next(colour)
+        ax.plot([i for i in range(0,len(P))], P, c=c, label = r' $\nu =$'+'${0}$'.format(nu))
+
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2),
+          ncol=6, fancybox=True, shadow=True)
+    plt.show()
+
+#### Investigating Attractor Dynamics ####
+# OLD CODE - If we decide it is needed for our results will refactor this to account for changes made to file names etc.
+#          - Remember that the boundaries would need to be calculated appropriately and entered into the functions.
 
 def probability_of_entering_attractor(activity, x):
     # NOTE: These values depend on how we define the width of each attractor. 
@@ -544,186 +692,18 @@ def plot_multiple_prob_vs_x(nu):
     plt.legend()
     plt.show()
 
-############ SURVIVAL CURVE ############
-
-def gen_survival_curve_data(nu, realisations = params['realisations']):
-
-    dirname = 'Single-Substrate-tmax-{0}-d-{1}'.format(params['tmax'], params['d'])
-
-    times_spent_in_fib = []
-    episodes_counted = 0
-    threshold = params['tissue_shape'][0]+0.05*params['tissue_shape'][0]
-
-    for i in range(0, realisations):
-        print "Working on realisation: ", i
-        # print("Episodes counted:", episodes_counted)
-        try:
-            with open(dirname + "/SS-nu-{0}-Run-{1}".format(nu, i), "r") as fh:
-                activity = pickle.load(fh)
-
-        except:
-            print("Data does not exist for; SS-nu-{0}-Run-{1}".format(nu, i))
-            break
-
-        #Work out (for each realisation) when the system enters and leaves fib.
-        try:
-            t = 0
-            while True:    
-                t_enters = enters_fib(t, activity, threshold)
-                t_leaves = leaves_fib(t_enters, activity, threshold)
-                # if type(t_enters) == type(None) or type(t_leaves) == type(None):
-                #     file_name = "/SS-nu-{1}-Run-{0}".format(i, nu)
-                #     plot_activity(dirname+ file_name)
-                if type(t_enters) == type(None):
-                    print "t_enters FAILED"
-                elif type(t_leaves) == type(None):
-                    print "t_leaves FAILED"
-                dt = t_leaves-t_enters
-
-                # If the list of integers representing the number of times a sim 'survived in fib' isn't 
-                # as long as the new data set of points to be added, extend this list with 0's to be that size. 
-                if len(times_spent_in_fib) < dt:        
-                    a = dt - len(times_spent_in_fib)
-                    for i in range(0, a):
-                        times_spent_in_fib.extend([0])
-
-                # Add 1 to each time 'bin' for each timestep that the sim remained in att.2. 
-                for i in range(0, dt):
-                    times_spent_in_fib[i] += 1
-                episodes_counted += 1
-                
-                t = t_leaves
-
-        except IndexError:
-            try: 
-                # Simulation terminates in fib.
-                t_enters = enters_fib(t, activity, threshold)
-                dt = len(activity) - t_enters                 #Sim ends in fib. so tmax - time it entered can be added to survival curve calc.
-        
-                if len(times_spent_in_fib) < dt:
-                    a = dt - len(times_spent_in_fib)
-                    for i in range(0, a):
-                        times_spent_in_fib.extend([0])
-
-                for i in range(0, dt):
-                    times_spent_in_fib[i] += 1
-                episodes_counted += 1
-            except IndexError:
-                #Simulation terminates in Sinus rhythm
-                pass
-        except ValueError:
-            #Sim enters fib within last two heartbeats of simulation
-            pass
-
-        # Converting times_spent_in_fib to probability list:
-        P = [float(i)/episodes_counted for i in times_spent_in_fib]
-
-        out_loc = dirname + '/Survival-Curve-{0}-{1}'.format(nu, realisations)
-        with open(out_loc, 'w') as fh:
-            pickle.dump(P, fh)
-
-def plot_survival_curve(nu, realisations = params['realisations']):
-    
-    dirname = 'Single-Substrate-tmax-{0}-d-{1}'.format(params['tmax'], params['d'])
-    try:
-        with open(dirname + '/Survival-Curve-{0}-{1}'.format(nu, realisations), 'r') as fh:
-            P = pickle.load(fh)
-        
-    except:
-        print("Generating data for Survival-Curve-{0}-{1}".format(nu, realisations))
-        gen_survival_curve_data(nu = nu)
-        with open(dirname + '/Survival-Curve-{0}-{1}'.format(nu, realisations), 'r') as fh:
-            P = pickle.load(fh)
-
-    ax = plt.gca()
-    ax = prepare_axes(ax, title = 'Survival Curve,' +r' $\nu =$'+'${0}$'.format(nu), 
-                      ylabel = 'Probability of remaining in fibrillation',
-                      xlabel = 'Time spent in fibrillation')
-    ax.plot([i for i in range(0,len(P))], P, '--')
-    plt.show()
-
-def plot_multiple_survival_curves(nus):
-
-    dirname = 'Single-Substrate-tmax-{0}-d-{1}'.format(params['tmax'], params['d'])
-    realisations = params['realisations']
-
-    ax = plt.gca()
-    ax = prepare_axes(ax, title = 'Survival Curve', 
-                      ylabel = 'Probability of remaining in fibrillation',
-                      xlabel = 'Time spent in fibrillation')
-    n = len(nus)
-    colour=iter(plt.cm.brg(np.linspace(0,0.9,n)))
-
-    for nu in nus:
-
-        try:
-            with open(dirname + '/Survival-Curve-{0}-{1}'.format(nu, realisations), 'r') as fh:
-                P = pickle.load(fh)
-            print("Succesfully loaded survival curve for nu = ", nu)
-        except:
-            print("Generating survival curve for nu = ", nu)
-            gen_survival_curve_data(nu, realisations)
-            with open(dirname + '/Survival-Curve-{0}-{1}'.format(nu, realisations), 'r') as fh:
-                P = pickle.load(fh)
-        c = next(colour)
-        ax.plot([i for i in range(0,len(P))], P, c=c, label = r' $\nu =$'+'${0}$'.format(nu))
-
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2),
-          ncol=6, fancybox=True, shadow=True)
-    plt.show()
-
-############ MISC PLOTTING #############
-
-def plot_activity(files):
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax = prepare_axes(ax)
-
-    for fname in glob.glob(files):
-        with open(fname, 'r') as fh:
-            time_act = pickle.load(fh)
-            if isinstance(time_act, list):
-                time_act = np.array(time_act)
-            try:
-                activity = time_act[0, :]
-            except IndexError:
-                activity = time_act
-
-            ax.plot(activity)
-        
-    plt.show()
-
-def plot_next_activity(fname):
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax = prepare_axes(ax) 
-
-    with open(fname, 'r') as fh:
-        time_act = pickle.load(fh)
-        if isinstance(time_act, list):
-            time_act = np.array(time_act)
-        try:
-            activity = time_act[0, :]
-        except IndexError:
-            activity = time_act
-
-        ax.scatter(activity[:-1], activity[1:])
-
-    plt.show()
-
 if __name__ == "__main__":
-    # generate_risk_curve_data()
-       
-    nus = [0.11, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05]
-    # generate_single_substrate_data_aging_tissue(nus)
+	### Sequence for generating data for a given patient: ###
+	# patient = 'A'
+	# simulate_patient(patient = patient, nus = patient_initial_nus, load_from_first_nu_in_nus = False)
+	# patient_specific_risk_curve(patient = patient, nus = patient_initial_nus, plot = True)
+	# # Define new set of nus, from the final usable nu in the initial set, through the dense set of nus near threshold, 
+	# # and finally to the lowest value of nu below threshold.
+	## nus = [] 
+	## simulate_patient(patient = patient, nus = nus, load_from_first_nu_in_nus = True)
+	## patient_specific_risk_curve(patient = patient, nus = nus, plot = True)
+	## # Bifurcation plot
+	## plot_mean_frequency_episodes(patient = patient, nus = nus)
+	## survival_curves_plot(nus)
 
-    plot_multiple_survival_curves(nus)
 
-    # plot_basins_of_attraction('./Single-Substrate-tmax-100000.0-d-0.01/SS-nu-0.09-Run-*', nu = 0.09, avg = True)
-    
-    # plot_prob_vs_x(nu = 0.05)
-
-    # plot_activity('./Single-Substrate-tmax-100000.0-d-0.01/SS-nu-0.07-Run-10')
-    # plot_next_activity('./Single-Substrate-tmax-100000.0-d-0.01/SS-nu-0.1-Run-3')
