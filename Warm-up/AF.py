@@ -41,7 +41,7 @@ def run(tmax=1e3, heart_rate=220, tissue_shape=(200, 200), nu=0.8, d=0.05,
             'tau':ref_period, 'nu':nu, 'shape':tissue_shape}
 
     if state_file is not None:
-        state_dict = StateLoader(state_file)
+        state_dict = Loader(state_file).contents
         myocardium = state_dict['myo']
         np.random.set_state(state_dict['rand_state'])
         tt = TimeTracker(tinit=state_dict['time'], tmax=tmax)
