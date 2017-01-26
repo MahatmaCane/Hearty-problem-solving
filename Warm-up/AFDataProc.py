@@ -94,6 +94,8 @@ def mean_time_fibrillating(activity):
             a = j
         except IndexError:
             break
+        except ValueError:
+        	break
 
     #Creating a list of 0's and 1's for each time step to note whether in fibrillatory state or not. This simplifies calculating mean_time_in_AF.
     try:
@@ -104,26 +106,28 @@ def mean_time_fibrillating(activity):
     x = len(entersfib)
     y = len(leavesfib)
 
+    # for k in range 0 to the length of the largest of entersfib or leaves fib. 
     for k in range(0, max(x,y)):
+    	#Try and create a list of 1's for when the system enters fib to when it leaves, the append with a list of 0's.
         try:
             is_fibrillating.extend([1 for i in range(entersfib[k],leavesfib[k])])
             is_fibrillating.extend([0 for j in range(leavesfib[k],entersfib[k])])
         except IndexError:
             if is_fibrillating[-1] == 1:
-                is_fibrillating.extend([0 for j in range(leavesfib[k],int(params['tmax']))])
+                is_fibrillating.extend([0 for j in range(leavesfib[-1],int(params['tmax']))])
             else:
-                is_fibrillating.extend([1 for i in range(entersfib[k],int(params['tmax']))])
+                is_fibrillating.extend([1 for i in range(entersfib[-1],int(params['tmax']))])
             break
 
     return np.mean(is_fibrillating)
 
 def simulate_patient(patient = 'A', nus = patient_initial_nus, load_from_first_nu_in_nus = False):
-	"""
+    """
     This function runs a patient specific simulation, logging the total activity for each realisation.
     It is imperative to ensure that any data associated with aging tissue is created in one batch, unless
     the state of the myocardium at a given nu is loaded, then each subsequent (decreased) nu value must
     have the data recreated for it.  
-	"""
+    """
 
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
     if not os.path.exists(dirname):
@@ -284,10 +288,11 @@ def patient_specific_risk_curve(patient = 'A', nus = patient_initial_nus, plot =
         std_devs = []    
 
         for nu in nus:
+            print "Generating data for nu = {0}/{1}".format(nu,nus[-1])
             time_in_AF = []
 
             for i in range(0, params['realisations']):
-                activity = pickle.load(open(dirname + '/Run-{0}-nu-{1}'.format(i, nu), "r"))
+                activity = pickle.load(open(dirname + "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, i), "r"))
                 mean_time_in_fib = mean_time_fibrillating(activity)
                 time_in_AF.append(mean_time_in_fib)
 
@@ -295,7 +300,7 @@ def patient_specific_risk_curve(patient = 'A', nus = patient_initial_nus, plot =
             std_devs.append(np.std(time_in_AF))
 
         with open(dirname + 'plot_data', 'w') as fh:
-            pickle.dump(mean_time_in_AF, std_devs)    
+            pickle.dump(np.array([mean_time_in_AF, std_devs]), fh)    
 
     plt.errorbar(nus, mean_time_in_AF, yerr=[i/(params['realisations'])**0.5 for i in std_devs], xerr=None, fmt='x', label = 'Data from us')
 
@@ -322,11 +327,11 @@ def mean_frequency_of_episodes(patient = 'A', nu = 1, realisations = params['rea
     for i in range(0, realisations):
         print "Realisation {0}/{1}".format(i,realisations)
         try:
-        	file_name = "/sim-patient-{0}-nu-{1}-Run-{0}".format(patient, nu, i)
+            file_name = "/sim-patient-{0}-nu-{1}-Run-{0}".format(patient, nu, i)
             with open(dirname + file_name, "r") as fh:
                 activity = pickle.load(fh)
         except:
-            print("Data does not exist for; SS-nu-{0}-Run-{1}".format(nu, i))
+            print("Data does not exist for; sim-patient-{2}-nu-{0}-Run-{1}".format(nu, i,patient))
             break
 
         try:
@@ -392,9 +397,9 @@ def plot_mean_frequency_episodes(patient = 'A', nus = patient_initial_nus, reali
 #### Critical Slowing Down ####
 
 def gen_survival_curve_data(patient = 'A', nu = 1, realisations = params['realisations']):
-	"""
+    """
     Generates and saves the survival curve data for given patient at a given nu.
-	"""
+    """
 
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
     subdirname = '/Survival-Curve'
@@ -407,7 +412,7 @@ def gen_survival_curve_data(patient = 'A', nu = 1, realisations = params['realis
         print "Working on realisation: ", i
         # print("Episodes counted:", episodes_counted)
         try:
-        	file_name = "/sim-patient-{0}-nu-{1}-Run-{0}".format(patient, nu, i)
+            file_name = "/sim-patient-{0}-nu-{1}-Run-{0}".format(patient, nu, i)
             with open(dirname + file_name, "r") as fh:
                 activity = pickle.load(fh)
 
@@ -500,6 +505,37 @@ def survival_curves_plot(nus):
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2),
           ncol=6, fancybox=True, shadow=True)
     plt.show()
+
+#### Transition probability matrix ####
+
+def transition_probability_matrix(patient, nu, run):
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    file_name = "/sim-patient-{2}-nu-{1}-Run-{0}".format(run, nu, patient)
+
+    with open(dirname + file_name, 'r') as fh:
+        activity = pickle.load(fh)
+
+    x = np.max(activity) + 1
+    trans_prob = np.zeros((x,x), dtype = np.float64)
+
+    for t in range(0,len(activity)-1):
+        a = activity[t]
+        b = activity[t+1]
+        trans_prob[a,b] += 1
+
+    num_rows = len(trans_prob[:,0])
+    for i in range(0, num_rows):
+        if np.sum(trans_prob[i,:]) != 0:
+            norm = np.sum(trans_prob[i,:])
+            trans_prob[i,:] /= norm
+
+    ax = plt.gca()
+    prepare_axes(ax, title="Transition Probability Matrix for nu = {0}, run {1}".format(nu,run),
+    	         xlabel="Activity, a(t+1)", ylabel="Activity, a(t)")
+    ax.pcolorfast(trans_prob, cmap = "Greys_r")
+    plt.show()
+
+    return trans_prob
 
 #### Investigating Attractor Dynamics ####
 # OLD CODE - If we decide it is needed for our results will refactor this to account for changes made to file names etc.
@@ -694,7 +730,7 @@ def plot_multiple_prob_vs_x(nu):
 
 if __name__ == "__main__":
 	### Sequence for generating data for a given patient: ###
-	# patient = 'A'
+	patient = 'A'
 	# simulate_patient(patient = patient, nus = patient_initial_nus, load_from_first_nu_in_nus = False)
 	# patient_specific_risk_curve(patient = patient, nus = patient_initial_nus, plot = True)
 	# # Define new set of nus, from the final usable nu in the initial set, through the dense set of nus near threshold, 
@@ -703,7 +739,7 @@ if __name__ == "__main__":
 	## simulate_patient(patient = patient, nus = nus, load_from_first_nu_in_nus = True)
 	## patient_specific_risk_curve(patient = patient, nus = nus, plot = True)
 	## # Bifurcation plot
-	## plot_mean_frequency_episodes(patient = patient, nus = nus)
-	## survival_curves_plot(nus)
+	# plot_mean_frequency_episodes(patient = patient, nus = patient_initial_nus)
+	# survival_curves_plot(nus=patient_initial_nus)
 
-
+	transition_probability_matrix(patient, 0.05,0)
