@@ -508,11 +508,9 @@ def survival_curves_plot(nus):
 
 #### Transition probability matrix ####
 
-def transition_probability_matrix(patient, nu, run):
-    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
-    file_name = "/sim-patient-{2}-nu-{1}-Run-{0}".format(run, nu, patient)
+def transition_probability_matrix(path_to_file, nu, plot=False):
 
-    with open(dirname + file_name, 'r') as fh:
+    with open(path_to_file, 'r') as fh:
         activity = pickle.load(fh)
 
     x = np.max(activity) + 1
@@ -529,13 +527,70 @@ def transition_probability_matrix(patient, nu, run):
             norm = np.sum(trans_prob[i,:])
             trans_prob[i,:] /= norm
 
-    ax = plt.gca()
-    prepare_axes(ax, title="Transition Probability Matrix for nu = {0}, run {1}".format(nu,run),
-    	         xlabel="Activity, a(t+1)", ylabel="Activity, a(t)")
-    ax.pcolorfast(trans_prob, cmap = "Greys_r")
-    plt.show()
+    if plot == True:
+        ax = plt.gca()
+        prepare_axes(ax, title=r"$Transition\ Probability\ Matrix\ for\ \nu = {0}$".format(nu),
+                     xlabel=r"$Activity\ a(t+1)$", ylabel=r"$Activity\ a(t)$")
+        ax.pcolorfast(trans_prob, cmap = "Greys_r")
+        plt.show(block=False)
 
     return trans_prob
+
+
+def argand_eigenvalues(path_to_file, nu):
+
+    tpm = transition_probability_matrix(path_to_file, nu)
+    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
+    eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
+    plt.scatter(eigenvalues.real, eigenvalues.imag, alpha=0.5, linewidths=0,
+                c = (np.absolute(eigenvalues) == eigenvalue_with_largest_mod))
+    plt.grid(True)
+    plt.title(r"$Argand\ Diagram\ of\ Transition\ Probability\ Matrix\ Eigenvalues,\ \nu = {},\ max\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$".format(nu, eigenvalue_with_largest_mod))
+    plt.show(block=False)
+
+
+def plot_mod_eigenvalues(path_to_file, nu, block=False):
+
+    tpm = transition_probability_matrix(path_to_file, nu)
+    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
+    eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
+    plt.scatter(range(np.size(eigenvalues)), np.absolute(eigenvalues), alpha=0.4, linewidths=0,
+                c=np.absolute(eigenvalues) == eigenvalue_with_largest_mod)
+    plt.grid(True)
+    plt.title(r"$\nu = {0}$".format(nu))
+    plt.ylabel(r"$\vert \lambda_i \vert$")
+    plt.xlabel(r"$i$")
+    plt.show(block=block)
+
+
+def plot_eigenvector_of_largest_eigenvalue(path_to_file, nu):
+
+    tpm = transition_probability_matrix(path_to_file, nu)
+    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
+    eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
+    column_index = np.where(np.absolute(eigenvalues) == eigenvalue_with_largest_mod)
+    vector = eigenvector_matrix[:, column_index]
+    fig, (real_ax, imag_ax) = plt.subplots(1, 2)
+    real_ax.scatter(range(np.size(vector)), vector.real, linewidths=0, alpha=0.4)
+    imag_ax.scatter(range(np.size(vector)), vector.imag, linewidths=0, alpha=0.4)
+    real_ax.grid(True)
+    imag_ax.grid(True)
+    real_ax.set_title(r"$Real\ part\ of\ elements\ of\ eigenvector\ with\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
+    imag_ax.set_title(r"$Imaginary\ part\ of\ elements\ of\ eigenvector\ with\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
+    plt.show(block=False)
+
+
+def plot_eigenvector_matrix(path_to_file, nu):
+
+    tpm = transition_probability_matrix(path_to_file, nu)
+    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
+    fig, (real_ax, imag_ax) = plt.subplots(1, 2)
+    real_im = real_ax.imshow(eigenvector_matrix.real, cmap="RdBu_r")
+    fig.colorbar(real_im)
+    imag_im = imag_ax.imshow(eigenvector_matrix.imag, cmap="RdBu_r")
+    fig.colorbar(imag_im)
+    plt.show(block=False)
+
 
 #### Investigating Attractor Dynamics ####
 # OLD CODE - If we decide it is needed for our results will refactor this to account for changes made to file names etc.
