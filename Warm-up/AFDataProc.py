@@ -12,7 +12,7 @@ import glob
 import pickle
 import matplotlib.pyplot as plt
 from AFModel import Myocardium
-from AFTools import TimeTracker, TotalActivity, prepare_axes, StatePickler, Loader
+from AFTools import TimeTracker, TotalActivity, prepare_axes, Saver, Loader
 
 params = dict(realisations = 60, tmax = 10e4, heart_rate = 250, 
               tissue_shape = (200,200), d = 0.01, e = 0.05, 
@@ -133,7 +133,7 @@ def simulate_patient(patient = 'A', nus = patient_initial_nus, load_from_first_n
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
-    sp = StatePickler()
+    sp = Saver()
     tt = TimeTracker(tmax=params['tmax'])
     runner = TimeTracker(tmax=params['realisations'])
    
@@ -508,28 +508,39 @@ def survival_curves_plot(nus):
 
 #### Transition probability matrix ####
 
-def transition_probability_matrix(path_to_file, nu, plot=False):
+def transition_probability_matrix(filepaths, nu, step=1, plot=False):
 
-    with open(path_to_file, 'r') as fh:
-        activity = pickle.load(fh)
+    activities = dict()
 
-    x = np.max(activity) + 1
-    trans_prob = np.zeros((x,x), dtype = np.float64)
+    matrix_dim = None
+    for fname in glob.glob(filepaths):
+        activity = Loader(fname).contents
+        # +1 ensures that matrix dimensions allow activity values of 0 and matrix_dim
+        this_max_act = np.max(activity) + 1
+        if matrix_dim is None:
+            matrix_dim = this_max_act
+        elif this_max_act > matrix_dim:
+            matrix_dim = this_max_act
+        activities[fname] = activity
 
-    for t in range(0,len(activity)-1):
-        a = activity[t]
-        b = activity[t+1]
-        trans_prob[a,b] += 1
+    H = None
+    for activity in activities.values():
+        x = activity[:-step]
+        y = activity[step:]
+        (hist, xe, ye) = np.histogram2d(x, y, bins=(matrix_dim, matrix_dim), range=[[0, matrix_dim],[0, matrix_dim]])
+        if H is None:
+            H = hist
+        else:
+            H += hist
 
-    num_rows = len(trans_prob[:,0])
-    for i in range(0, num_rows):
-        if np.sum(trans_prob[i,:]) != 0:
-            norm = np.sum(trans_prob[i,:])
-            trans_prob[i,:] /= norm
+    # Normalise
+    normalisation = np.sum(H, axis=1, dtype=np.float64).reshape(matrix_dim, 1)
+    normalisation[normalisation == 0.] = 1.
+    trans_prob = H/normalisation
 
     if plot == True:
-        ax = plt.gca()
-        prepare_axes(ax, title=r"$Transition\ Probability\ Matrix\ for\ \nu = {0}$".format(nu),
+        fig, (ax) = plt.subplots(1, 1)
+        prepare_axes(ax, title=r"$Transition\ Probability\ Matrix\ for\ \nu = {0}, \Delta t = {1}$".format(nu, step),
                      xlabel=r"$Activity\ a(t+1)$", ylabel=r"$Activity\ a(t)$")
         ax.pcolorfast(trans_prob, cmap = "Greys_r")
         plt.show(block=False)
@@ -537,9 +548,9 @@ def transition_probability_matrix(path_to_file, nu, plot=False):
     return trans_prob
 
 
-def argand_eigenvalues(path_to_file, nu):
+def argand_eigenvalues(filepaths, nu):
 
-    tpm = transition_probability_matrix(path_to_file, nu)
+    tpm = transition_probability_matrix(filepaths, nu)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
     plt.scatter(eigenvalues.real, eigenvalues.imag, alpha=0.5, linewidths=0,
@@ -549,9 +560,9 @@ def argand_eigenvalues(path_to_file, nu):
     plt.show(block=False)
 
 
-def plot_mod_eigenvalues(path_to_file, nu, block=False):
+def plot_mod_eigenvalues(filepaths, nu, block=False):
 
-    tpm = transition_probability_matrix(path_to_file, nu)
+    tpm = transition_probability_matrix(filepaths, nu)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
     plt.scatter(range(np.size(eigenvalues)), np.absolute(eigenvalues), alpha=0.4, linewidths=0,
@@ -563,9 +574,9 @@ def plot_mod_eigenvalues(path_to_file, nu, block=False):
     plt.show(block=block)
 
 
-def plot_eigenvector_of_largest_eigenvalue(path_to_file, nu):
+def plot_eigenvector_of_largest_eigenvalue(filepaths, nu):
 
-    tpm = transition_probability_matrix(path_to_file, nu)
+    tpm = transition_probability_matrix(filepaths, nu)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
     column_index = np.where(np.absolute(eigenvalues) == eigenvalue_with_largest_mod)
@@ -580,9 +591,9 @@ def plot_eigenvector_of_largest_eigenvalue(path_to_file, nu):
     plt.show(block=False)
 
 
-def plot_eigenvector_matrix(path_to_file, nu):
+def plot_eigenvector_matrix(filepaths, nu):
 
-    tpm = transition_probability_matrix(path_to_file, nu)
+    tpm = transition_probability_matrix(filepaths, nu)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     fig, (real_ax, imag_ax) = plt.subplots(1, 2)
     real_im = real_ax.imshow(eigenvector_matrix.real, cmap="RdBu_r")
