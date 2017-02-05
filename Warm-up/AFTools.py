@@ -78,6 +78,13 @@ class StatePickler:
         with open(out_dir + '/State-{0}-{1}'.format(myocardium._nu, t), 'w') as fh:
             pickle.dump(info, fh)
 
+    def sequence_to_csv(self, sequence, location):
+
+        with open(location, 'w') as fh:
+            for i in sequence:
+                fh.write('{0}\n'.format(i))
+
+
 class Loader:
 
     def __init__(self, path_to_file):
