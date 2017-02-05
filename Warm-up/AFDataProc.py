@@ -12,7 +12,7 @@ import glob
 import pickle
 import matplotlib.pyplot as plt
 from AFModel import Myocardium
-from AFTools import TimeTracker, TotalActivity, prepare_axes, Saver, Loader
+from AFTools import TimeTracker, TotalActivity, prepare_axes, StatePickler, Loader
 
 params = dict(realisations = 60, tmax = 10e4, heart_rate = 250, 
               tissue_shape = (200,200), d = 0.01, e = 0.05, 
@@ -133,7 +133,7 @@ def simulate_patient(patient = 'A', nus = patient_initial_nus, load_from_first_n
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
-    sp = Saver()
+    sp = StatePickler()
     tt = TimeTracker(tmax=params['tmax'])
     runner = TimeTracker(tmax=params['realisations'])
    
@@ -513,6 +513,7 @@ def transition_probability_matrix(filepaths, nu, step=1, plot=False):
     activities = dict()
 
     matrix_dim = None
+    print glob.glob(filepaths)
     for fname in glob.glob(filepaths):
         activity = Loader(fname).contents
         # +1 ensures that matrix dimensions allow activity values of 0 and matrix_dim
@@ -522,6 +523,7 @@ def transition_probability_matrix(filepaths, nu, step=1, plot=False):
         elif this_max_act > matrix_dim:
             matrix_dim = this_max_act
         activities[fname] = activity
+    print matrix_dim
 
     H = None
     for activity in activities.values():
@@ -548,35 +550,37 @@ def transition_probability_matrix(filepaths, nu, step=1, plot=False):
     return trans_prob
 
 
-def argand_eigenvalues(filepaths, nu):
+def argand_eigenvalues(filepaths, nu, step=1):
 
-    tpm = transition_probability_matrix(filepaths, nu)
+    tpm = transition_probability_matrix(filepaths, nu, step=step)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
-    plt.scatter(eigenvalues.real, eigenvalues.imag, alpha=0.5, linewidths=0,
+    fig, (ax) = plt.subplots(1, 1)
+    ax.scatter(eigenvalues.real, eigenvalues.imag, alpha=0.5, linewidths=0,
                 c = (np.absolute(eigenvalues) == eigenvalue_with_largest_mod))
-    plt.grid(True)
-    plt.title(r"$Argand\ Diagram\ of\ Transition\ Probability\ Matrix\ Eigenvalues,\ \nu = {},\ max\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$".format(nu, eigenvalue_with_largest_mod))
+    ax.grid(True)
+    ax.set_title(r"$Argand\ Diagram\ of\ Transition\ Probability\ Matrix\ Eigenvalues,\ \nu = {},\ max\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$".format(nu, eigenvalue_with_largest_mod))
     plt.show(block=False)
 
 
-def plot_mod_eigenvalues(filepaths, nu, block=False):
+def plot_mod_eigenvalues(filepaths, nu, step=1, block=False):
 
-    tpm = transition_probability_matrix(filepaths, nu)
+    tpm = transition_probability_matrix(filepaths, nu, step=step)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
-    plt.scatter(range(np.size(eigenvalues)), np.absolute(eigenvalues), alpha=0.4, linewidths=0,
+    fig, (ax) = plt.subplots(1, 1)
+    ax.scatter(range(np.size(eigenvalues)), np.absolute(eigenvalues), alpha=0.4, linewidths=0,
                 c=np.absolute(eigenvalues) == eigenvalue_with_largest_mod)
-    plt.grid(True)
-    plt.title(r"$\nu = {0}$".format(nu))
-    plt.ylabel(r"$\vert \lambda_i \vert$")
-    plt.xlabel(r"$i$")
+    ax.grid(True)
+    ax.set_title(r"$\nu = {0}$".format(nu))
+    ax.set_ylabel(r"$\vert \lambda_i \vert$")
+    ax.set_xlabel(r"$i$")
     plt.show(block=block)
 
 
-def plot_eigenvector_of_largest_eigenvalue(filepaths, nu):
+def plot_eigenvector_of_largest_eigenvalue(filepaths, nu, step=1):
 
-    tpm = transition_probability_matrix(filepaths, nu)
+    tpm = transition_probability_matrix(filepaths, nu, step=step)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
     column_index = np.where(np.absolute(eigenvalues) == eigenvalue_with_largest_mod)
@@ -591,15 +595,35 @@ def plot_eigenvector_of_largest_eigenvalue(filepaths, nu):
     plt.show(block=False)
 
 
-def plot_eigenvector_matrix(filepaths, nu):
+def plot_eigenvector_matrix(filepaths, nu, step=1):
 
-    tpm = transition_probability_matrix(filepaths, nu)
+    tpm = transition_probability_matrix(filepaths, nu, step=step)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     fig, (real_ax, imag_ax) = plt.subplots(1, 2)
     real_im = real_ax.imshow(eigenvector_matrix.real, cmap="RdBu_r")
     fig.colorbar(real_im)
     imag_im = imag_ax.imshow(eigenvector_matrix.imag, cmap="RdBu_r")
     fig.colorbar(imag_im)
+    plt.show(block=False)
+
+
+def plot_second_eigenvector(filepaths, nu, step=1):
+
+    tpm = transition_probability_matrix(filepaths, nu, step=step)
+    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
+    fig, (real_ax, imag_ax) = plt.subplots(1, 2)
+    eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
+    others = [n for n in list(eigenvalues) if abs(n)!=eigenvalue_with_largest_mod]
+    column_index = np.where(np.absolute(eigenvalues) == max(others))
+    vector = eigenvector_matrix[:, column_index]
+    fig, (real_ax, imag_ax) = plt.subplots(1, 2)
+    real_ax.scatter(range(np.size(vector)), vector.real, linewidths=0, alpha=0.4)
+    imag_ax.scatter(range(np.size(vector)), vector.imag, linewidths=0, alpha=0.4)
+    real_ax.grid(True)
+    imag_ax.grid(True)
+    fig.suptitle(r"$\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$".format(max(others)))
+    real_ax.set_title(r"$Real\ part\ of\ elements\ of\ eigenvector\ with\ second\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
+    imag_ax.set_title(r"$Imaginary\ part\ of\ elements\ of\ eigenvector\ with\ second\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
     plt.show(block=False)
 
 

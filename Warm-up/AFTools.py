@@ -55,11 +55,9 @@ def prepare_axes(ax, title=None, xlabel=None, ylabel=None):
         ax.set_ylabel(ylabel)
     return ax
 
-class Saver:
+class StatePickler:
 
-    def save_array(self, location, array):
-
-        np.save(location, array)
+    """Object for pickling state of the myocardium."""
 
     def pickle_state(self, out_dir, myocardium, random_state, t):
 
@@ -84,8 +82,5 @@ class Loader:
 
     def __init__(self, path_to_file):
 
-        try:
-            with open(path_to_file, 'r') as fh:
-                self.contents = pickle.load(fh)
-        except:
-            self.contents = np.load(path_to_file)
+        with open(path_to_file, 'r') as fh:
+            self.contents = pickle.load(fh)
