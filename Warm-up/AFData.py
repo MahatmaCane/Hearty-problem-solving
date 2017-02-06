@@ -1,6 +1,7 @@
 import glob
 import numpy as np
 import pickle
+import pandas as pd
 
 from matplotlib import pyplot as plt
 
@@ -219,3 +220,8 @@ def plot_next_activity(fname):
         ax.scatter(activity[:-1], activity[1:])
 
     plt.show(block=False)
+
+def autocorr(series, lag=1):
+
+    series = pd.Series(series)
+    return series.autocorr(lag=lag)
