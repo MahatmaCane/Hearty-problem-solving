@@ -4,25 +4,25 @@ import numpy as np
 
 class Myocardium:
 
-    def __init__(self, tissue_shape=(5, 5), nu=0.5, d=0.2, e=0.4, refractory_period=5):
+    def __init__(self, tissue_shape=(5, 5), d=0.01, e=0.05, refractory_period=50):
 
         self.shape = tissue_shape
-        self._nu = nu
         self._delta = d
         self._epsilon = e
         self._refractory_period = refractory_period
 
-        self.__determine_locations_of_lateral_couplings()
+        self.__determine_random_lateral_coupling_array()
         self.__determine_locations_of_defective_cells()
+
+        self.couplings_set = False
 
         self.counts_until_relaxed = np.zeros(self.shape, dtype=np.float64)
         self.wavefront = np.zeros(self.shape, dtype=np.bool)
         self.permanently_unexcitable = np.zeros(tissue_shape)
 
-    def __determine_locations_of_lateral_couplings(self):
+    def __determine_random_lateral_coupling_array(self):
 
-        random = np.random.random(self.shape)
-        self.lateral_couplings = random <= self._nu
+        self.__random_lateral = np.random.random(self.shape)
 
     def __determine_locations_of_defective_cells(self):
 
@@ -56,8 +56,18 @@ class Myocardium:
         refractory_cells = self.counts_until_relaxed > 0
         self.counts_until_relaxed[refractory_cells] -= 1
         self.counts_until_relaxed[self.wavefront] = self._refractory_period 
- 
+
+    def determine_lateral_couplings(self, nu):
+
+        self.couplings_set = True
+        self._nu = nu
+        self.lateral_couplings = self.__random_lateral <= float(nu)
+
     def evolve(self, pulse=False):
+
+        if self.couplings_set is False:
+            raise ValueError("""Value for fraction of lateral couplings present 
+                                must be set.""")
 
         self.__find_cells_to_excite()
 
@@ -93,17 +103,3 @@ class Myocardium:
         self.counts_until_relaxed[:, :] = 0
         self.wavefront[:, :] = False
 
-    def age_tissue(self, nu, target_nu):
-
-        """Remove lateral couplings stochastically until nu is reduced to target nu."""
-
-        #This function is stochastic, since nu is initially determined probabilistically, the reduction of nu also must be
-        #determined probabilistically.
-
-        perc_to_keep = float(target_nu)/nu    #percentage of lateral couplings to retain.
-        perc_to_del = 1 - perc_to_keep
-        random = np.random.random(self.shape) #All values randomly between 0 & 1
-        # Let elements of self.lateral_couplings be random numbers between 0 & 1, then keep 'perc_to_keep' of them, setting them to 1, and set the rest to 0.
-        self.lateral_couplings = self.lateral_couplings * random >= perc_to_del
-        self._nu = target_nu
-        
