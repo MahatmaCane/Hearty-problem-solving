@@ -1,11 +1,3 @@
-# When generating the whole data set for a given patient, remember that any change in the initial data set from 
-# simulate_patient will require DELETING and recreating the data for subsequent functions such as patient_specific_risk_curve,
-# basins_of_attraction_plot, flickering and survival_curves_plot.
-
-# TO DO:
-# Generate all data for given patient to test each function works.
-# When threshold is defined, test Loader class to generate survival curve near threshold for dense list of nus. 
-
 import numpy as np
 import os
 import glob
