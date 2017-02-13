@@ -510,85 +510,97 @@ def survival_curves_plot(nus):
 
 def transition_probability_matrix(filepaths, nu, step=1, plot=False):
 
+    """Construct the transition probability matrix from multiple realisations
+       of a given myocardium.
+
+       Inputs:
+        - filepaths:    paths to files containing time series'. str or list.
+        - nu (float):   fraction of transversal couplings present.
+        - step (int):   transition matrix produced is the probability of being
+                        at some activity after `step' time steps given that it
+                        is at some activity. Default 1.
+        - plot (bool):  plot matrix if True. Default False.
+
+        Output:
+        - trans_prob (np.ndarray), the transition probability matrix."""
+
     activities = dict()
 
-    matrix_dim = None
-    print glob.glob(filepaths)
+    dim = None
     for fname in glob.glob(filepaths):
         activity = Loader(fname).contents
-        # +1 ensures that matrix dimensions allow activity values of 0 and matrix_dim
+        # +1 ensures that matrix dimensions allow activity values of 0 and dim
         this_max_act = np.max(activity) + 1
-        if matrix_dim is None:
-            matrix_dim = this_max_act
-        elif this_max_act > matrix_dim:
-            matrix_dim = this_max_act
+        if dim is None:
+            dim = this_max_act
+        elif this_max_act > dim:
+            dim = this_max_act
         activities[fname] = activity
-    print matrix_dim
 
     H = None
     for activity in activities.values():
         x = activity[:-step]
         y = activity[step:]
-        (hist, xe, ye) = np.histogram2d(x, y, bins=(matrix_dim, matrix_dim), range=[[0, matrix_dim],[0, matrix_dim]])
+        (hist, xe, ye) = np.histogram2d(x, y, bins=(dim, dim),
+                                        range=[[0, dim],[0, dim]])
         if H is None:
             H = hist
         else:
             H += hist
 
     # Normalise
-    normalisation = np.sum(H, axis=1, dtype=np.float64).reshape(matrix_dim, 1)
+    normalisation = np.sum(H, axis=0, dtype=np.float64)
     normalisation[normalisation == 0.] = 1.
     trans_prob = H/normalisation
 
     if plot == True:
         fig, (ax) = plt.subplots(1, 1)
-        prepare_axes(ax, title=r"$Transition\ Probability\ Matrix\ for\ \nu = {0}, \Delta t = {1}$".format(nu, step),
-                     xlabel=r"$Activity\ a(t+1)$", ylabel=r"$Activity\ a(t)$")
+        prepare_axes(ax, xlabel=r"$a(t+1)$", ylabel=r"$a(t)$",
+                     title=r"$Stochastic\ matrix,\ \nu={0}, \Delta t={1}$".format(nu, step))
         ax.pcolorfast(trans_prob, cmap = "Greys_r")
         plt.show(block=False)
 
     return trans_prob
 
 
-def argand_eigenvalues(filepaths, nu, step=1, transpose=True):
+def argand_eigenvalues(filepaths, nu, step=1):
+
+    """Construct transition probability matrix and plot Argand diagram of
+       eigenvalues. See transition_probability_matrix for info on first three
+       input params."""
 
     tpm = transition_probability_matrix(filepaths, nu, step=step)
-    if transpose is True:
-        tpm = tpm.T
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
-    eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
+    eig_with_largest_mod = np.max(np.absolute(eigenvalues))
     fig, (ax) = plt.subplots(1, 1)
     fig.suptitle(r"$\Delta t = {0}$".format(step))
     ax.scatter(eigenvalues.real, eigenvalues.imag, alpha=0.5, linewidths=0,
-                c = (np.absolute(eigenvalues) == eigenvalue_with_largest_mod))
+                c = (np.absolute(eigenvalues) == eig_with_largest_mod))
     ax.grid(True)
-    ax.set_title(r"$Argand\ Diagram\ of\ Transition\ Probability\ Matrix\ Eigenvalues,\ \nu = {},\ max\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$".format(nu, eigenvalue_with_largest_mod))
+    ax.set_title(r"""$Argand\ Diagram\ of\ Transition\ Probability\ Matrix\ 
+                      Eigenvalues,\ \nu = {},\ max\lbrace \vert \lambda_i \vert
+                      \rbrace = {:.17f}$""".format(nu, eig_with_largest_mod))
     plt.show(block=False)
 
 
-def plot_mod_eigenvalues(filepaths, nu, step=1, block=False, transpose=True):
+def plot_mod_eigenvalues(filepaths, nu, step=1, block=False):
 
     tpm = transition_probability_matrix(filepaths, nu, step=step)
-    if transpose is True:
-        tpm = tpm.T
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
     fig, (ax) = plt.subplots(1, 1)
-    ax.scatter(range(np.size(eigenvalues)), np.absolute(eigenvalues), alpha=0.4, linewidths=0,
-                c=np.absolute(eigenvalues) == eigenvalue_with_largest_mod)
-    ax.grid(True)
+    ax = prepare_axes(ax, title=r"$\nu = {0}$".format(nu), xlabel=r"$i$",
+                      ylabel=r"$\vert \lambda_i \vert$")
+    ax.scatter(range(np.size(eigenvalues)), np.absolute(eigenvalues),
+               c=np.absolute(eigenvalues) == eigenvalue_with_largest_mod,
+               alpha=0.4, linewidths=0)
     fig.suptitle(r"$\Delta t = {0}$".format(step))
-    ax.set_title(r"$\nu = {0}$".format(nu))
-    ax.set_ylabel(r"$\vert \lambda_i \vert$")
-    ax.set_xlabel(r"$i$")
     plt.show(block=block)
 
 
-def plot_eigenvector_of_largest_eigenvalue(filepaths, nu, step=1, transpose=False):
+def plot_eigenvector_of_largest_eigenvalue(filepaths, nu, step=1):
 
     tpm = transition_probability_matrix(filepaths, nu, step=step)
-    if transpose is True:
-        tpm = tpm.T
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
     column_index = np.where(np.absolute(eigenvalues) == eigenvalue_with_largest_mod)
@@ -604,7 +616,7 @@ def plot_eigenvector_of_largest_eigenvalue(filepaths, nu, step=1, transpose=Fals
     plt.show(block=False)
 
 
-def plot_eigenvector_matrix(filepaths, nu, step=1, transpose=True):
+def plot_eigenvector_matrix(filepaths, nu, step=1):
 
     tpm = transition_probability_matrix(filepaths, nu, step=step)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
@@ -616,11 +628,9 @@ def plot_eigenvector_matrix(filepaths, nu, step=1, transpose=True):
     plt.show(block=False)
 
 
-def plot_second_eigenvector(filepaths, nu, step=1, transpose=False):
+def plot_second_eigenvector(filepaths, nu, step=1):
 
     tpm = transition_probability_matrix(filepaths, nu, step=step)
-    if transpose is True:
-        tpm = tpm.T
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     fig, (real_ax, imag_ax) = plt.subplots(1, 2)
     eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
