@@ -134,7 +134,7 @@ def simulate_patient(patient = 'A', nus = patient_initial_nus, load_from_first_n
                                 params['e'], params['refractory_period'])
 
     elif load_from_first_nu_in_nus == True:
-        myocardium = Loader(path_to_file = dirname + '/State-{0}-{1}'.format(myocardium._nu, 0)).contents()
+        myocardium = Loader(path_to_file = dirname + '/State-{0}-{1}'.format(myocardium._nu, 0)).contents
         nus = nus[1:]
 
     for nu in nus:
@@ -502,40 +502,53 @@ def survival_curves_plot(nus):
 
 def transition_probability_matrix(filepaths, nu, step=1, plot=False):
 
+    """Construct the transition probability matrix from multiple realisations
+       of a given myocardium.
+
+       Inputs:
+        - filepaths:    paths to files containing time series'. str or list.
+        - nu (float):   fraction of transversal couplings present.
+        - step (int):   transition matrix produced is the probability of being
+                        at some activity after `step' time steps given that it
+                        is at some activity. Default 1.
+        - plot (bool):  plot matrix if True. Default False.
+
+        Output:
+        - trans_prob (np.ndarray), the transition probability matrix."""
+
     activities = dict()
 
-    matrix_dim = None
-    print glob.glob(filepaths)
+    dim = None
     for fname in glob.glob(filepaths):
         activity = Loader(fname).contents
-        # +1 ensures that matrix dimensions allow activity values of 0 and matrix_dim
+        # +1 ensures that matrix dimensions allow activity values of 0 and dim
         this_max_act = np.max(activity) + 1
-        if matrix_dim is None:
-            matrix_dim = this_max_act
-        elif this_max_act > matrix_dim:
-            matrix_dim = this_max_act
+        if dim is None:
+            dim = this_max_act
+        elif this_max_act > dim:
+            dim = this_max_act
         activities[fname] = activity
-    print matrix_dim
 
     H = None
     for activity in activities.values():
         x = activity[:-step]
         y = activity[step:]
-        (hist, xe, ye) = np.histogram2d(x, y, bins=(matrix_dim, matrix_dim), range=[[0, matrix_dim],[0, matrix_dim]])
+        (hist, xe, ye) = np.histogram2d(x, y, bins=(dim, dim),
+                                        range=[[0, dim],[0, dim]])
         if H is None:
             H = hist
         else:
             H += hist
 
     # Normalise
-    normalisation = np.sum(H, axis=1, dtype=np.float64).reshape(matrix_dim, 1)
+    normalisation = np.sum(H, axis=0, dtype=np.float64)
     normalisation[normalisation == 0.] = 1.
     trans_prob = H/normalisation
 
     if plot == True:
         fig, (ax) = plt.subplots(1, 1)
-        prepare_axes(ax, title=r"$Transition\ Probability\ Matrix\ for\ \nu = {0}, \Delta t = {1}$".format(nu, step),
-                     xlabel=r"$Activity\ a(t+1)$", ylabel=r"$Activity\ a(t)$")
+        prepare_axes(ax, xlabel=r"$a(t+1)$", ylabel=r"$a(t)$",
+                     title=r"$Stochastic\ matrix,\ \nu={0}, \Delta t={1}$".format(nu, step))
         ax.pcolorfast(trans_prob, cmap = "Greys_r")
         plt.show(block=False)
 
@@ -544,14 +557,21 @@ def transition_probability_matrix(filepaths, nu, step=1, plot=False):
 
 def argand_eigenvalues(filepaths, nu, step=1):
 
+    """Construct transition probability matrix and plot Argand diagram of
+       eigenvalues. See transition_probability_matrix for info on first three
+       input params."""
+
     tpm = transition_probability_matrix(filepaths, nu, step=step)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
-    eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
+    eig_with_largest_mod = np.max(np.absolute(eigenvalues))
     fig, (ax) = plt.subplots(1, 1)
+    fig.suptitle(r"$\Delta t = {0}$".format(step))
     ax.scatter(eigenvalues.real, eigenvalues.imag, alpha=0.5, linewidths=0,
-                c = (np.absolute(eigenvalues) == eigenvalue_with_largest_mod))
+                c = (np.absolute(eigenvalues) == eig_with_largest_mod))
     ax.grid(True)
-    ax.set_title(r"$Argand\ Diagram\ of\ Transition\ Probability\ Matrix\ Eigenvalues,\ \nu = {},\ max\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$".format(nu, eigenvalue_with_largest_mod))
+    ax.set_title(r"""$Argand\ Diagram\ of\ Transition\ Probability\ Matrix\ 
+                      Eigenvalues,\ \nu = {},\ max\lbrace \vert \lambda_i \vert
+                      \rbrace = {:.17f}$""".format(nu, eig_with_largest_mod))
     plt.show(block=False)
 
 
@@ -561,12 +581,12 @@ def plot_mod_eigenvalues(filepaths, nu, step=1, block=False):
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
     eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
     fig, (ax) = plt.subplots(1, 1)
-    ax.scatter(range(np.size(eigenvalues)), np.absolute(eigenvalues), alpha=0.4, linewidths=0,
-                c=np.absolute(eigenvalues) == eigenvalue_with_largest_mod)
-    ax.grid(True)
-    ax.set_title(r"$\nu = {0}$".format(nu))
-    ax.set_ylabel(r"$\vert \lambda_i \vert$")
-    ax.set_xlabel(r"$i$")
+    ax = prepare_axes(ax, title=r"$\nu = {0}$".format(nu), xlabel=r"$i$",
+                      ylabel=r"$\vert \lambda_i \vert$")
+    ax.scatter(range(np.size(eigenvalues)), np.absolute(eigenvalues),
+               c=np.absolute(eigenvalues) == eigenvalue_with_largest_mod,
+               alpha=0.4, linewidths=0)
+    fig.suptitle(r"$\Delta t = {0}$".format(step))
     plt.show(block=block)
 
 
@@ -582,6 +602,7 @@ def plot_eigenvector_of_largest_eigenvalue(filepaths, nu, step=1):
     imag_ax.scatter(range(np.size(vector)), vector.imag, linewidths=0, alpha=0.4)
     real_ax.grid(True)
     imag_ax.grid(True)
+    fig.suptitle(r"$\Delta t = {0}$".format(step))
     real_ax.set_title(r"$Real\ part\ of\ elements\ of\ eigenvector\ with\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
     imag_ax.set_title(r"$Imaginary\ part\ of\ elements\ of\ eigenvector\ with\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
     plt.show(block=False)
@@ -613,9 +634,9 @@ def plot_second_eigenvector(filepaths, nu, step=1):
     imag_ax.scatter(range(np.size(vector)), vector.imag, linewidths=0, alpha=0.4)
     real_ax.grid(True)
     imag_ax.grid(True)
-    fig.suptitle(r"$\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$".format(max(others)))
-    real_ax.set_title(r"$Real\ part\ of\ elements\ of\ eigenvector\ with\ second\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
-    imag_ax.set_title(r"$Imaginary\ part\ of\ elements\ of\ eigenvector\ with\ second\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
+    fig.suptitle(r"$\vert \lambda_i \vert = {:.17f}$".format(max(others)))
+    real_ax.set_title(r"$Real\ part\ of\ elements\ of\ eigenvector\ with\ second\ largest\ eigenvalue,\ \nu = {0}, \Delta t = {1}$".format(nu, step))
+    imag_ax.set_title(r"$Imaginary\ part\ of\ elements\ of\ eigenvector\ with\ second\ largest\ eigenvalue,\ \nu = {0}, \Delta t = {1}$".format(nu, step))
     plt.show(block=False)
 
 
@@ -812,16 +833,16 @@ def plot_multiple_prob_vs_x(nu):
 
 if __name__ == "__main__":
 	### Sequence for generating data for a given patient: ###
-	patient = 'A'
+	patient = 'D'
 	# simulate_patient(patient = patient, nus = patient_initial_nus, load_from_first_nu_in_nus = False)
 	# patient_specific_risk_curve(patient = patient, nus = patient_initial_nus, plot = True)
 	# # Define new set of nus, from the final usable nu in the initial set, through the dense set of nus near threshold, 
 	# # and finally to the lowest value of nu below threshold.
-	## nus = [] 
-	## simulate_patient(patient = patient, nus = nus, load_from_first_nu_in_nus = True)
+	nus = list(np.linspace(0.14, 0.05, 16))
+	simulate_patient(patient = patient, nus = nus)
 	## patient_specific_risk_curve(patient = patient, nus = nus, plot = True)
 	## # Bifurcation plot
 	# plot_mean_frequency_episodes(patient = patient, nus = patient_initial_nus)
 	# survival_curves_plot(nus=patient_initial_nus)
 
-	transition_probability_matrix(patient, 0.05,0)
+	#transition_probability_matrix(patient, 0.05,0)
