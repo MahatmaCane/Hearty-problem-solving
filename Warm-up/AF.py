@@ -31,7 +31,7 @@ def run(tmax=1e5, heart_rate=220, tissue_shape=(200, 200), nu=0.08, d=0.05,
         - dump_loc:         Output directory for data-dumping. If False, no
                             data-dumping occurs.
         - pickle_period:    Integer. Pickle myocardium and state of numpy random
-                            number generator after every pickle_frequency time steps.
+                            number generator after every pickle_period time steps.
         - state_file:       Path to file containing desired initial state of the 
                             myocardium and numpy RNG. String.
         - new_RNG:          Bool. Switch for using a new state for loaded numpy
