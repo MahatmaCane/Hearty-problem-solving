@@ -82,7 +82,7 @@ class StatePickler:
 
         with open(location, 'w') as fh:
             for i in sequence:
-                fh.write('{0},\n'.format(i))
+                fh.write('{0}\n'.format(i))
 
 
 class Loader:
