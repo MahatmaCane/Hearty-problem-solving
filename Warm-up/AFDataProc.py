@@ -618,4 +618,3 @@ def plot_second_eigenvector(filepaths, nu, step=1):
 if __name__ == "__main__":
     simulate_patient('E', nus = [1,0.5,0.05], state_file = None)
     # activity_time_series('Jacob', 0.5, 0)
-
