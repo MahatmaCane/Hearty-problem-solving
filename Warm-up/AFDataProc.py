@@ -500,7 +500,7 @@ def transition_probability_matrix(filepaths, nu, step=1, plot=False):
 
     dim = None
     for fname in glob.glob(filepaths):
-        activity = Loader(fname).contents
+        activity = np.genfromtxt(fname)
         # +1 ensures that matrix dimensions allow activity values of 0 and dim
         this_max_act = np.max(activity) + 1
         if dim is None:
@@ -527,8 +527,9 @@ def transition_probability_matrix(filepaths, nu, step=1, plot=False):
 
     if plot == True:
         fig, (ax) = plt.subplots(1, 1)
+        tit = r"$Stochastic\ matrix,\ \nu={0}, \Delta t={1}$".format(nu, step)
         prepare_axes(ax, xlabel=r"$a(t+1)$", ylabel=r"$a(t)$",
-                     title=r"$Stochastic\ matrix,\ \nu={0}, \Delta t={1}$".format(nu, step))
+                     title=tit)
         ax.pcolorfast(trans_prob, cmap = "Greys_r")
         plt.show(block=False)
 
@@ -571,17 +572,17 @@ def plot_eigenvector_of_largest_eigenvalue(filepaths, nu, step=1):
 
     tpm = transition_probability_matrix(filepaths, nu, step=step)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
-    eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
-    column_index = np.where(np.absolute(eigenvalues) == eigenvalue_with_largest_mod)
-    vector = eigenvector_matrix[:, column_index]
+    eig_with_largest_mod = np.max(np.absolute(eigenvalues))
+    column_index = np.where(np.absolute(eigenvalues) == eig_with_largest_mod)
+    vec = eigenvector_matrix[:, column_index]
     fig, (real_ax, imag_ax) = plt.subplots(1, 2)
-    real_ax.scatter(range(np.size(vector)), vector.real, linewidths=0, alpha=0.4)
-    imag_ax.scatter(range(np.size(vector)), vector.imag, linewidths=0, alpha=0.4)
+    real_ax.scatter(range(np.size(vec)), vec.real, linewidths=0, alpha=0.4)
+    imag_ax.scatter(range(np.size(vec)), vec.imag, linewidths=0, alpha=0.4)
     real_ax.grid(True)
     imag_ax.grid(True)
-    fig.suptitle(r"$\Delta t = {0}$".format(step))
-    real_ax.set_title(r"$Real\ part\ of\ elements\ of\ eigenvector\ with\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
-    imag_ax.set_title(r"$Imaginary\ part\ of\ elements\ of\ eigenvector\ with\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
+    fig.suptitle(r"$\Delta t={0},\ \nu = {1}$".format(step, nu))
+    real_ax.set_title(r"$Re(eig'vector\ of\ largest\ eig'value)$"))
+    imag_ax.set_title(r"$Im(eig'vector\ of\ largest\ eig'value)$")
     plt.show(block=False)
 
 def plot_eigenvector_matrix(filepaths, nu, step=1):
@@ -617,4 +618,4 @@ def plot_second_eigenvector(filepaths, nu, step=1):
 if __name__ == "__main__":
     # simulate_patient('Jacob', nus = [1,0.5,0.05], state_file = None)
     # activity_time_series('Jacob', 0.5, 0)
-    
+    pass
