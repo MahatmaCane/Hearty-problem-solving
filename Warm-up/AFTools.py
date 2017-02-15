@@ -92,3 +92,10 @@ class Loader:
         with open(path_to_file, 'r') as fh:
             self.state = pickle.load(fh)
         return self.state
+
+    def file_len(self, fname):
+
+        with open(fname) as f:
+            for i, l in enumerate(f):
+                pass
+        return i + 1
