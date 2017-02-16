@@ -496,34 +496,45 @@ def transition_probability_matrix(filepaths, nu, step=1, plot=False):
         Output:
         - trans_prob (np.ndarray), the transition probability matrix."""
 
-    activities = dict()
+    tpm_loc = os.path.dirname(filepaths) + "/TPM-{}.npy".format(nu)
 
-    dim = None
-    for fname in glob.glob(filepaths):
-        activity = np.genfromtxt(fname)
-        # +1 ensures that matrix dimensions allow activity values of 0 and dim
-        this_max_act = np.max(activity) + 1
-        if dim is None:
-            dim = this_max_act
-        elif this_max_act > dim:
-            dim = this_max_act
-        activities[fname] = activity
+    # Check to see if exists in directory already
+    if not os.path.exists(tpm_loc):
 
-    H = None
-    for activity in activities.values():
-        x = activity[:-step]
-        y = activity[step:]
-        (hist, xe, ye) = np.histogram2d(x, y, bins=(dim, dim),
-                                        range=[[0, dim],[0, dim]])
-        if H is None:
-            H = hist
-        else:
-            H += hist
+        print "File {0} does not exist. Creating.".format(tpm_loc)
+        activities = dict()
 
-    # Normalise
-    normalisation = np.sum(H, axis=0, dtype=np.float64)
-    normalisation[normalisation == 0.] = 1.
-    trans_prob = H/normalisation
+        dim = None
+        for fname in glob.glob(filepaths):
+            activity = np.genfromtxt(fname)
+            # +1 ensures that matrix dimensions allow activity values of 0 and dim
+            this_max_act = np.max(activity) + 1
+            if dim is None:
+                dim = this_max_act
+            elif this_max_act > dim:
+                dim = this_max_act
+            activities[fname] = activity
+
+        H = None
+        for activity in activities.values():
+            x = activity[:-step]
+            y = activity[step:]
+            (hist, xe, ye) = np.histogram2d(x, y, bins=(dim, dim),
+                                            range=[[0, dim],[0, dim]])
+            if H is None:
+                H = hist
+            else:
+                H += hist
+
+        # Normalise
+        normalisation = np.sum(H, axis=0, dtype=np.float64)
+        normalisation[normalisation == 0.] = 1.
+        trans_prob = H/normalisation
+        np.save(tpm_loc, trans_prob)
+
+    else:
+        print "File exists"
+        trans_prob = np.load(tpm_loc)
 
     if plot == True:
         fig, (ax) = plt.subplots(1, 1)
@@ -549,9 +560,7 @@ def argand_eigenvalues(filepaths, nu, step=1):
     ax.scatter(eigenvalues.real, eigenvalues.imag, alpha=0.5, linewidths=0,
                 c = (np.absolute(eigenvalues) == eig_with_largest_mod))
     ax.grid(True)
-    ax.set_title(r"""$Argand\ Diagram\ of\ Transition\ Probability\ Matrix\ 
-                      Eigenvalues,\ \nu = {},\ max\lbrace \vert \lambda_i \vert
-                      \rbrace = {:.17f}$""".format(nu, eig_with_largest_mod))
+    ax.set_title(r"""$Argand\ Diagram\ of\ TPM\ e'vals,\ \nu={},\ max\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$""".format(nu, eig_with_largest_mod))
     plt.show(block=False)
 
 def plot_mod_eigenvalues(filepaths, nu, step=1, block=False):
@@ -575,6 +584,8 @@ def plot_eigenvector_of_largest_eigenvalue(filepaths, nu, step=1):
     eig_with_largest_mod = np.max(np.absolute(eigenvalues))
     column_index = np.where(np.absolute(eigenvalues) == eig_with_largest_mod)
     vec = eigenvector_matrix[:, column_index]
+    if np.sum(vec) <= 0.:
+        vec *= -1
     fig, (real_ax, imag_ax) = plt.subplots(1, 2)
     real_ax.scatter(range(np.size(vec)), vec.real, linewidths=0, alpha=0.4)
     imag_ax.scatter(range(np.size(vec)), vec.imag, linewidths=0, alpha=0.4)
@@ -615,6 +626,20 @@ def plot_second_eigenvector(filepaths, nu, step=1):
     imag_ax.set_title(r"$Imaginary\ part\ of\ elements\ of\ eigenvector\ with\ second\ largest\ eigenvalue,\ \nu = {0}, \Delta t = {1}$".format(nu, step))
     plt.show(block=False)
 
+def plot_degrees_activity(files, nu, step=1):
+
+    tpm = transition_probability_matrix(files, nu, step=step)
+    fig, (in_ax, out_ax) = plt.subplots(1, 2)
+    fig.suptitle(r"$\Delta t={0},\ \nu={1}$".format(step, nu))
+    prepare_axes(in_ax, xlabel=r"$Activity$", ylabel=r"$In-degree$")
+    prepare_axes(out_ax, xlabel=r"$Activity$", ylabel=r"$Out-degree$")
+    adj = tpm > 0.
+    out_degs = adj.sum(axis=0)
+    in_degs = adj.sum(axis=1)
+    out_ax.scatter(range(out_degs.size), out_degs)
+    in_ax.scatter(range(in_degs.size), in_degs)
+    plt.show(block=False)
+
 if __name__ == "__main__":
-    simulate_patient('E', nus = [1,0.5,0.05], state_file = None)
+    simulate_patient('E', nus = [0.1, 0.075, 0.025, 0.2, 0.15], state_file = "Patient-E-100000.0-0.01-0.05/State-0")
     # activity_time_series('Jacob', 0.5, 0)
