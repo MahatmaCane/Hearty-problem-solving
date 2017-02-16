@@ -75,7 +75,7 @@ class StatePickler:
            and <time> = t."""
 
         info = {'myo':myocardium, 'rand_state':random_state, 'time':t}
-        with open(out_dir + '/State-{0}-{1}'.format(myocardium._nu, t), 'w') as fh:
+        with open(out_dir + '/State-{0}'.format(t), 'w') as fh:
             pickle.dump(info, fh)
 
     def sequence_to_csv(self, sequence, location):
@@ -87,7 +87,15 @@ class StatePickler:
 
 class Loader:
 
-    def __init__(self, path_to_file):
+    def load_state(self, path_to_file):
 
         with open(path_to_file, 'r') as fh:
-            self.contents = pickle.load(fh)
+            self.state = pickle.load(fh)
+        return self.state
+
+    def file_len(self, fname):
+
+        with open(fname) as f:
+            for i, l in enumerate(f):
+                pass
+        return i + 1

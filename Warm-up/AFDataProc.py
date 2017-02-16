@@ -4,13 +4,12 @@ import glob
 import pickle
 import matplotlib.pyplot as plt
 from AFModel import Myocardium
-from AFTools import TimeTracker, TotalActivity, prepare_axes, StatePickler, Loader
+from AFTools import *
+from AF import run
 
-params = dict(realisations = 60, tmax = 10e4, heart_rate = 250, 
+params = dict(realisations = 40, tmax = 1e5, heart_rate = 220, 
               tissue_shape = (200,200), d = 0.01, e = 0.05, 
               refractory_period = 50)
-
-patient_initial_nus = [0.11, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05] #Initial values of nu to generate patient-specific risk curve data - to be determined from generic_model_risk_curve.
 
 #### Generic Functions Used Throughout ####
 
@@ -113,51 +112,45 @@ def mean_time_fibrillating(activity):
 
     return np.mean(is_fibrillating)
 
-def simulate_patient(patient = 'A', nus = patient_initial_nus, load_from_first_nu_in_nus = False):
-    """
-    This function runs a patient specific simulation, logging the total activity for each realisation.
-    It is imperative to ensure that any data associated with aging tissue is created in one batch, unless
-    the state of the myocardium at a given nu is loaded, then each subsequent (decreased) nu value must
-    have the data recreated for it.  
+#### Generate patient specific simulation data ####
+
+def simulate_patient(patient, nus, state_file):
+    """ state_file is initially None. This means in first call of run() a state file will be created.
+        state_file is created with name: out_dir ( = os.path.dirname(dump_loc) ) + State-0
+        Next call of run() want the state_file to be used to load the correct substrate.
+
+        **Assumption: Location of defective cells remains unchanged when loading myocardium from state_file.
+        **Assumption: When calling run() a new myocardium is created, and so myocardium.reset() is not needed.
+
     """
 
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
-    if not os.path.exists(dirname):
-        os.makedirs(dirname)
-
-    sp = StatePickler()
-    tt = TimeTracker(tmax=params['tmax'])
-    runner = TimeTracker(tmax=params['realisations'])
-   
-    if load_from_first_nu_in_nus == False:
-        myocardium = Myocardium(params['tissue_shape'], nus[0], params['d'], 
-                                params['e'], params['refractory_period'])
-
-    elif load_from_first_nu_in_nus == True:
-        myocardium = Loader(path_to_file = dirname + '/State-{0}-{1}'.format(myocardium._nu, 0)).contents
-        nus = nus[1:]
-
+    
     for nu in nus:
+        for i in range(0, params['realisations']):
 
-        sp.pickle_state(out_dir = dirname, myocardium = myocardium, 
-                        random_state = np.random.get_state(), t=0) 
-
-        for i in runner:
-            print "Beginning simulation number {0} for nu = {1}".format(i, nu)
-            total_activity = TotalActivity()
             file_name = "/sim-patient-{2}-nu-{1}-Run-{0}".format(i, nu, patient)
-            for time in tt:
-                if time%params['heart_rate'] == 0:
-                    myocardium.evolve(pulse=True)
-                else:
-                    myocardium.evolve()
-                activity = myocardium.number_of_active_cells()
-                total_activity.record(activity)
-            with open(dirname + file_name, 'w') as fh:
-                pickle.dump(total_activity.activity, fh)
-            myocardium.reset()
-        if nu != nus[-1]:
-            myocardium.age_tissue(nu, nus[nus.index(nu) + 1])
+            dump_loc = dirname + file_name
+
+            run(params['tmax'], params['heart_rate'], params['tissue_shape'], nu, params['d'],
+                params['e'], params['refractory_period'], False, dump_loc, None,
+                state_file, True)
+            
+            if state_file == None:
+                state_file = dirname + '/State-{0}'.format(0)
+
+#### Time Series ####
+
+def activity_time_series(patient, nu, run):
+    
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    file_name = "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, run)
+
+    activity = [i for i in np.genfromtxt(dirname + file_name)]
+    #np.genfromtxt(path)
+
+    plt.plot(activity)
+    plt.show()
 
 #### Determining Critical Threshold - Risk Curve ####
 
@@ -171,7 +164,7 @@ def generic_model_risk_curve():
            0.14, 0.16, 0.18, 0.2, 0.22, 
            0.24, 0.26, 0.28, 0.3, 0.1]
 
-    dirname = 'Generic-Risk-Curve-{0}-{1}-{2}'.format(params['d'], params['e'], params['tmax'])
+    dirname = '/Generic-Risk-Curve-{0}-{1}-{2}'.format(params['d'], params['e'], params['tmax'])
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
@@ -187,29 +180,18 @@ def generic_model_risk_curve():
 
             for i in range(0, params['realisations']):
                 try:
-                    activity = pickle.load(open(dirname + '/Run-{0}-nu-{1}'.format(i, nu), "r"))
+                    activity = [i for i in np.genfromtxt(dirname + '/Run-{0}-nu-{1}'.format(i, nu))]
                     mean_time_in_fib = mean_time_fibrillating(activity)
                     time_in_AF.append(mean_time_in_fib)
                 except:
                     print("Data for nu = {0}, realisation {1}, does not exist... generating data".format(nu,i))
+                    
+                    dump_loc = dirname + '/Run-{0}-nu-{1}'.format(i, nu)
+                    run(params['tmax'], params['heart_rate'], params['tissue_shape'], nu, params['d'],
+                        params['e'], params['refractory_period'], False, dump_loc, None,
+                        None, True)
 
-                    myocardium = Myocardium(params['tissue_shape'], nu, params['d'], 
-                                            params['e'], params['refractory_period'])
-                    total_activity = TotalActivity()
-                    tt = TimeTracker(params['tmax'])
-                    total_activity.record(myocardium.number_of_active_cells())
-
-                    for time in tt:
-                        if time%params['heart_rate'] == 0:
-                            myocardium.evolve(pulse=True)
-                        else:
-                            myocardium.evolve()
-                        total_activity.record(myocardium.number_of_active_cells())
-
-                    with open(dirname + '/Run-{0}-nu-{1}'.format(i, nu),'w') as fh:
-                        pickle.dump(np.array(total_activity.activity), fh)
-                
-                    activity = pickle.load(open(dirname + '/Run-{0}-nu-{1}'.format(i, nu), "r"))
+                    activity = [i for i in np.genfromtxt(dump_loc)]
                     mean_time_in_fib = mean_time_fibrillating(activity)
                     time_in_AF.append(mean_time_in_fib)
 
@@ -217,7 +199,8 @@ def generic_model_risk_curve():
             std_devs.append(np.std(time_in_AF))
 
         with open(dirname + 'plot_data', 'w') as fh:
-        	pickle.dump(mean_time_in_AF, std_devs)
+            pickle.dump(mean_time_in_AF, std_devs)
+
 
     kishanNus = [0.02, 0.04, 0.06, 0.08, 0.11, 
                  0.13, 0.15, 0.17, 0.19, 0.21, 
@@ -247,8 +230,8 @@ def generic_model_risk_curve():
     plt.title('Realisations: {0}'.format(params['realisations']))
     plt.legend()
     plt.show()
-       
-def patient_specific_risk_curve(patient = 'A', nus = patient_initial_nus, plot = True):
+
+def patient_specific_risk_curve(patient = 'A', nus = [], plot = True):
     """
     Want to generate a risk curve for a given patient with enough data around the threshold.
     Must first run this function with patient_initial_nus to roughly determine the threshold.
@@ -266,7 +249,7 @@ def patient_specific_risk_curve(patient = 'A', nus = patient_initial_nus, plot =
         os.makedirs(dirname+subdirname)
 
     try:
-    	mean_time_in_AF, std_devs = pickle.load(open(dirname + subdirname + 'plot_data', 'w'))
+        mean_time_in_AF, std_devs = pickle.load(open(dirname + subdirname + 'plot_data', 'w'))
 
     except:
         for nu in nus:
@@ -284,7 +267,7 @@ def patient_specific_risk_curve(patient = 'A', nus = patient_initial_nus, plot =
             time_in_AF = []
 
             for i in range(0, params['realisations']):
-                activity = pickle.load(open(dirname + "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, i), "r"))
+                activity = [i for i in np.genfromtxt(dirname + "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, i))]
                 mean_time_in_fib = mean_time_fibrillating(activity)
                 time_in_AF.append(mean_time_in_fib)
 
@@ -304,11 +287,11 @@ def patient_specific_risk_curve(patient = 'A', nus = patient_initial_nus, plot =
 
 #### Bifurcation of States ####
 
-# Define function which loads the data for a given patient, and plots the 'basins of attraction' at each nu.
+# Functions for generating plot showing bifurcation of states for both a given patient at some nu and at multiplie values of nu.
 
 #### Flickering ####
 
-def mean_frequency_of_episodes(patient = 'A', nu = 1, realisations = params['realisations']):
+def mean_frequency_of_episodes(patient, nu, realisations):
     
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
     subdirname = '/Flickering-Data'
@@ -320,10 +303,10 @@ def mean_frequency_of_episodes(patient = 'A', nu = 1, realisations = params['rea
         print "Realisation {0}/{1}".format(i,realisations)
         try:
             file_name = "/sim-patient-{0}-nu-{1}-Run-{0}".format(patient, nu, i)
-            with open(dirname + file_name, "r") as fh:
-                activity = pickle.load(fh)
+            activity = [i for i in np.genfromtxt(dirname + file_name)]
+
         except:
-            print("Data does not exist for; sim-patient-{2}-nu-{0}-Run-{1}".format(nu, i,patient))
+            print("Data does not exist for; sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, i))
             break
 
         try:
@@ -357,11 +340,11 @@ def mean_frequency_of_episodes(patient = 'A', nu = 1, realisations = params['rea
     result = float(episodes_counted)/realisations
 
     with open(dirname + subdirname + 'nu-{0}-realisations-{1}'.format(nu,realisations), 'w') as fh:
-    	pickle.dump(result, fh)
+        pickle.dump(result, fh)
 
     return result
 
-def plot_mean_frequency_episodes(patient = 'A', nus = patient_initial_nus, realisations = params['realisations']):
+def plot_mean_frequency_episodes(patient, nus, realisations):
     
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
     subdirname = '/Flickering-Data'
@@ -369,7 +352,7 @@ def plot_mean_frequency_episodes(patient = 'A', nus = patient_initial_nus, reali
     mean_freqs = []
 
     for nu in nus:
-    	try:
+        try:
             with open(dirname + subdirname +'nu-{0}-realisations-{1}'.format(nu,realisations), 'r') as fh:
                 data = pickle.load(fh)
             print "Succesfully loaded data for file_name: nu-{0}-realisations-{1}".format(nu,realisations)
@@ -381,14 +364,12 @@ def plot_mean_frequency_episodes(patient = 'A', nus = patient_initial_nus, reali
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax = prepare_axes(ax)   
-
     ax.scatter(nus, mean_freqs)  
-
     plt.show()
 
 #### Critical Slowing Down ####
 
-def gen_survival_curve_data(patient = 'A', nu = 1, realisations = params['realisations']):
+def gen_survival_curve_data(patient, nu, realisations):
     """
     Generates and saves the survival curve data for given patient at a given nu.
     """
@@ -405,8 +386,7 @@ def gen_survival_curve_data(patient = 'A', nu = 1, realisations = params['realis
         # print("Episodes counted:", episodes_counted)
         try:
             file_name = "/sim-patient-{0}-nu-{1}-Run-{0}".format(patient, nu, i)
-            with open(dirname + file_name, "r") as fh:
-                activity = pickle.load(fh)
+            activity = [i for i in np.genfromtxt(dirname + file_name)]
 
         except:
             print("Data does not exist for file_name: {0}".format(file_name))
@@ -432,7 +412,7 @@ def gen_survival_curve_data(patient = 'A', nu = 1, realisations = params['realis
                     for i in range(0, a):
                         times_spent_in_fib.extend([0])
 
-                # Add 1 to each time 'bin' for each timestep that the sim remained in att.2. 
+                # Add 1 to each time 'bin' for each timestep that the sim remained in fib. 
                 for i in range(0, dt):
                     times_spent_in_fib[i] += 1
                 episodes_counted += 1
@@ -495,7 +475,7 @@ def survival_curves_plot(nus):
         ax.plot([i for i in range(0,len(P))], P, c=c, label = r' $\nu =$'+'${0}$'.format(nu))
 
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2),
-          ncol=6, fancybox=True, shadow=True)
+              ncol=6, fancybox=True, shadow=True)
     plt.show()
 
 #### Transition probability matrix ####
@@ -516,44 +496,55 @@ def transition_probability_matrix(filepaths, nu, step=1, plot=False):
         Output:
         - trans_prob (np.ndarray), the transition probability matrix."""
 
-    activities = dict()
+    tpm_loc = os.path.dirname(filepaths) + "/TPM-{}.npy".format(nu)
 
-    dim = None
-    for fname in glob.glob(filepaths):
-        activity = Loader(fname).contents
-        # +1 ensures that matrix dimensions allow activity values of 0 and dim
-        this_max_act = np.max(activity) + 1
-        if dim is None:
-            dim = this_max_act
-        elif this_max_act > dim:
-            dim = this_max_act
-        activities[fname] = activity
+    # Check to see if exists in directory already
+    if not os.path.exists(tpm_loc):
 
-    H = None
-    for activity in activities.values():
-        x = activity[:-step]
-        y = activity[step:]
-        (hist, xe, ye) = np.histogram2d(x, y, bins=(dim, dim),
-                                        range=[[0, dim],[0, dim]])
-        if H is None:
-            H = hist
-        else:
-            H += hist
+        print "File {0} does not exist. Creating.".format(tpm_loc)
+        activities = dict()
 
-    # Normalise
-    normalisation = np.sum(H, axis=0, dtype=np.float64)
-    normalisation[normalisation == 0.] = 1.
-    trans_prob = H/normalisation
+        dim = None
+        for fname in glob.glob(filepaths):
+            activity = np.genfromtxt(fname)
+            # +1 ensures that matrix dimensions allow activity values of 0 and dim
+            this_max_act = np.max(activity) + 1
+            if dim is None:
+                dim = this_max_act
+            elif this_max_act > dim:
+                dim = this_max_act
+            activities[fname] = activity
+
+        H = None
+        for activity in activities.values():
+            x = activity[:-step]
+            y = activity[step:]
+            (hist, xe, ye) = np.histogram2d(x, y, bins=(dim, dim),
+                                            range=[[0, dim],[0, dim]])
+            if H is None:
+                H = hist
+            else:
+                H += hist
+
+        # Normalise
+        normalisation = np.sum(H, axis=0, dtype=np.float64)
+        normalisation[normalisation == 0.] = 1.
+        trans_prob = H/normalisation
+        np.save(tpm_loc, trans_prob)
+
+    else:
+        print "File exists"
+        trans_prob = np.load(tpm_loc)
 
     if plot == True:
         fig, (ax) = plt.subplots(1, 1)
+        tit = r"$Stochastic\ matrix,\ \nu={0}, \Delta t={1}$".format(nu, step)
         prepare_axes(ax, xlabel=r"$a(t+1)$", ylabel=r"$a(t)$",
-                     title=r"$Stochastic\ matrix,\ \nu={0}, \Delta t={1}$".format(nu, step))
+                     title=tit)
         ax.pcolorfast(trans_prob, cmap = "Greys_r")
         plt.show(block=False)
 
     return trans_prob
-
 
 def argand_eigenvalues(filepaths, nu, step=1):
 
@@ -569,11 +560,8 @@ def argand_eigenvalues(filepaths, nu, step=1):
     ax.scatter(eigenvalues.real, eigenvalues.imag, alpha=0.5, linewidths=0,
                 c = (np.absolute(eigenvalues) == eig_with_largest_mod))
     ax.grid(True)
-    ax.set_title(r"""$Argand\ Diagram\ of\ Transition\ Probability\ Matrix\ 
-                      Eigenvalues,\ \nu = {},\ max\lbrace \vert \lambda_i \vert
-                      \rbrace = {:.17f}$""".format(nu, eig_with_largest_mod))
+    ax.set_title(r"""$Argand\ Diagram\ of\ TPM\ e'vals,\ \nu={},\ max\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$""".format(nu, eig_with_largest_mod))
     plt.show(block=False)
-
 
 def plot_mod_eigenvalues(filepaths, nu, step=1, block=False):
 
@@ -589,24 +577,24 @@ def plot_mod_eigenvalues(filepaths, nu, step=1, block=False):
     fig.suptitle(r"$\Delta t = {0}$".format(step))
     plt.show(block=block)
 
-
 def plot_eigenvector_of_largest_eigenvalue(filepaths, nu, step=1):
 
     tpm = transition_probability_matrix(filepaths, nu, step=step)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
-    eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
-    column_index = np.where(np.absolute(eigenvalues) == eigenvalue_with_largest_mod)
-    vector = eigenvector_matrix[:, column_index]
+    eig_with_largest_mod = np.max(np.absolute(eigenvalues))
+    column_index = np.where(np.absolute(eigenvalues) == eig_with_largest_mod)
+    vec = eigenvector_matrix[:, column_index]
+    if np.sum(vec) <= 0.:
+        vec *= -1
     fig, (real_ax, imag_ax) = plt.subplots(1, 2)
-    real_ax.scatter(range(np.size(vector)), vector.real, linewidths=0, alpha=0.4)
-    imag_ax.scatter(range(np.size(vector)), vector.imag, linewidths=0, alpha=0.4)
+    real_ax.scatter(range(np.size(vec)), vec.real, linewidths=0, alpha=0.4)
+    imag_ax.scatter(range(np.size(vec)), vec.imag, linewidths=0, alpha=0.4)
     real_ax.grid(True)
     imag_ax.grid(True)
-    fig.suptitle(r"$\Delta t = {0}$".format(step))
-    real_ax.set_title(r"$Real\ part\ of\ elements\ of\ eigenvector\ with\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
-    imag_ax.set_title(r"$Imaginary\ part\ of\ elements\ of\ eigenvector\ with\ largest\ eigenvalue,\ \nu = {0}$".format(nu))
+    fig.suptitle(r"$\Delta t={0},\ \nu = {1}$".format(step, nu))
+    real_ax.set_title(r"$Re(eig'vector\ of\ largest\ eig'value)$")
+    imag_ax.set_title(r"$Im(eig'vector\ of\ largest\ eig'value)$")
     plt.show(block=False)
-
 
 def plot_eigenvector_matrix(filepaths, nu, step=1):
 
@@ -618,7 +606,6 @@ def plot_eigenvector_matrix(filepaths, nu, step=1):
     imag_im = imag_ax.imshow(eigenvector_matrix.imag, cmap="RdBu_r")
     fig.colorbar(imag_im)
     plt.show(block=False)
-
 
 def plot_second_eigenvector(filepaths, nu, step=1):
 
@@ -639,210 +626,20 @@ def plot_second_eigenvector(filepaths, nu, step=1):
     imag_ax.set_title(r"$Imaginary\ part\ of\ elements\ of\ eigenvector\ with\ second\ largest\ eigenvalue,\ \nu = {0}, \Delta t = {1}$".format(nu, step))
     plt.show(block=False)
 
+def plot_degrees_activity(files, nu, step=1):
 
-#### Investigating Attractor Dynamics ####
-# OLD CODE - If we decide it is needed for our results will refactor this to account for changes made to file names etc.
-#          - Remember that the boundaries would need to be calculated appropriately and entered into the functions.
-
-def probability_of_entering_attractor(activity, x):
-    # NOTE: These values depend on how we define the width of each attractor. 
-    #       May want to call function to calculate appropriate boundaries here.
-    high_bound_attractor_1 = 205
-    low_bound_attractor_2 = 537
-
-    ### Calculating all times at which system is in sinus rhythm ###
-    a = 0
-    leavesfib = [0]  #Assume system starts in sinus rhythm (as it does)
-    threshold = params['tissue_shape'][0]+0.05*params['tissue_shape'][0]
-    
-    def times_in_sinus_rhythm(a,activity,treshold):
-        while a != None:
-            try:
-                i = enters_fib(a, activity, threshold)
-                a = i
-                j = leaves_fib(a, activity, threshold)
-                leavesfib.append(j) 
-                a = j
-            except IndexError:
-                return
-            
-    times_in_sinus_rhythm(a,activity,threshold)
-    #################################################################
-    ### Calculating times when activity = x and system has just come from sinus rhythm ###
-    t0 = []
-    def activity_is_x(t, activity):
-        """ Searches activity list from time t for first occurance of activity = x.
-            Assume we have ensured system is coming from sinus rhythm (equive attractor 1)."""
-        for i in range(t,len(activity)):
-            if activity[i] == x:
-                return i
-            if i+1 == len(activity):
-                raise IndexError 
-    
-    for i in leavesfib:
-        try:
-            t0.append(activity_is_x(i, activity))
-        except IndexError:
-        	pass
-    #######################################################################################
-    ### Check whether the activity proceeds to attractor 1 or 2 first, and append the  ###
-    ### result to the appropriate list.                                                ###
-
-    P1 = []
-    P2 = []
-    if t0 != []:
-    	for t in t0:
-            try:
-                att1 = cross_boundary(t, activity, high_bound_attractor_1, 'above')
-                att2 = cross_boundary(t, activity, low_bound_attractor_2, 'below')
-                # Deciding which attractor is entered first,
-                if att2 < att1:
-                    P1.extend([0])
-                    P2.extend([1])
-                elif att1 < att2:
-                    P1.extend([1])
-                    P2.extend([0])
-            except IndexError:
-                # From time t, either system only enters one of the attractors or it enters neither,
-                try:
-                    att1 = cross_boundary(t, activity, high_bound_attractor_1, 'above')
-                    P1.extend([1])
-                    P2.extend([0])
-                except IndexError:
-                    # System doesn't transition to attractor 1, meaning it either transitions to attractor 2 or neither, 
-                    try:
-                        att2 = cross_boundary(t, activity, low_bound_attractor_2, 'below')
-                        P1.extend([0])
-                        P2.extend([1])
-                    except IndexError:
-                        pass    # Discard this value of x as not enough time elapsed for system to reach attractor.
-    
-    return P1, P2
-
-def plot_prob_vs_x(nu):
-    """ 
-    Loads or Generates data for probability that the state transitions to attractor 1
-    or attractor 2 for a range of initial activity values, then plots that data.
-    This is designed to show that there are indeed attractors of the dynamics.
-    """
-    dirname = 'Single-Substrate-tmax-{0}-d-{1}'.format(params['tmax'], params['d'])
-    perc = 70
-
-    try:
-        data = pickle.load(open(dirname + '/prob-trans-curve-{0}-{1}-{2}'.format(nu, params['realisations'],perc), "r"))
-        prob_attr_1 = data[0]
-        prob_attr_2 = data[1]
-        
-    except:
-        high_bound_attractor_1 = 205
-        low_bound_attractor_2 = 537
-        diff = low_bound_attractor_2 - high_bound_attractor_1
-        data_points = 20
-
-        xs = [i for i in range(high_bound_attractor_1, low_bound_attractor_2, diff/data_points)]
-
-        prob_attr_1 = []
-        prob_attr_2 = []
-
-        for x in xs:
-            print "Generating data for %i/%i" %(xs.index(x),len(xs))
-            P1 = []
-            P2 = []
-            for i in range(0,params['realisations']):
-                activity = pickle.load(open(dirname + "/SS-nu-{1}-Run-{0}".format(i, nu), "r"))
-                p1, p2 = probability_of_entering_attractor(activity, x)
-                ### For each x, Want to extend P1 for each i, then want to calculate the sum/length 
-                ### which gives the 'probability' of transition to attractor 1.
-                P1.extend(p1)
-                P2.extend(p2)
-
-            if P1 != []:
-                prob_attr_1.extend( [(float(np.sum(P1))/len(P1), x)] )
-            if P2 != []:
-                prob_attr_2.extend( [(float(np.sum(P2))/len(P2), x)] )
-
-        with open(dirname + '/prob-trans-curve-{0}-{1}-{2}'.format(nu, params['realisations'],perc),'w') as fh:
-            pickle.dump(np.array([prob_attr_1, prob_attr_2]), fh)
-
-    plt.plot( [j for (i,j) in prob_attr_1], [i for (i,j) in prob_attr_1], 'bo-', label = 'P1')  
-    plt.plot( [j for (i,j) in prob_attr_2], [i for (i,j) in prob_attr_2] ,'ro-', label = 'P2')
-
-    plt.title('Probability for transition to each attractor \n of the dynamics if activity starts at value x \n for simulation where nu = {0}, with {1} realisations.'.format(nu, params['realisations']))
-    plt.xlabel('x')
-    plt.ylabel('Probability')
-    plt.legend()
-    plt.show()
-
-def plot_multiple_prob_vs_x(nu):
-    """ 
-    Loads or Generates data for probability that the state transitions to attractor 1
-    or attractor 2 for a range of initial activity values, then plots that data.
-    This is designed to show that there are indeed attractors of the dynamics.
-    """
-    dirname = 'Single-Substrate-tmax-{0}-d-{1}'.format(params['tmax'], params['d'])
-    percs = [70,80,90]    #Percentages associated with widths of boundaries
-    high_bounds_attractor_1 = [205,205,205]
-    low_bounds_attractor_2 = [501,520,537]
-
-    n = len(2*percs)
-    colour=iter(plt.cm.rainbow(np.linspace(0,1,n)))
-
-    for perc in percs:
-        try:
-            data = pickle.load(open(dirname + '/prob-trans-curve-{0}-{1}-{2}'.format(nu, params['realisations'],perc), "r"))
-            prob_attr_1 = data[0]
-            prob_attr_2 = data[1]
-
-        except:
-            high_bound_attractor_1 = high_bounds_attractor_1[percs.index(perc)]
-            low_bound_attractor_2 = low_bounds_attractor_2[percs.index(perc)]
-            diff = low_bound_attractor_2 - high_bound_attractor_1
-            data_points = 20
-
-            xs = [i for i in range(high_bound_attractor_1, low_bound_attractor_2, diff/data_points)]
-
-            prob_attr_1 = []
-            prob_attr_2 = []
-
-            for x in xs:
-                print "Generating data for %i/%i" %(xs.index(x),len(xs))
-                P1 = []
-                P2 = []
-                for i in range(0,params['realisations']):
-                    activity = pickle.load(open(dirname + "/SS-nu-{1}-Run-{0}".format(i, nu), "r"))
-                    p1, p2 = probability_of_entering_attractor(activity, x)
-                    P1.extend(p1)
-                    P2.extend(p2)
-
-                if P1 != []:
-                    prob_attr_1.extend( [(float(np.sum(P1))/len(P1), x)] )
-                if P2 != []:
-                    prob_attr_2.extend( [(float(np.sum(P2))/len(P2), x)] )
-
-            with open(dirname + '/prob-trans-curve-{0}-{1}-{2}'.format(nu, params['realisations'],perc),'w') as fh:
-                pickle.dump(np.array([prob_attr_1, prob_attr_2]), fh)
-
-        plt.plot( [j for (i,j) in prob_attr_1], [i for (i,j) in prob_attr_1], c = next(colour), linestyle='o-', label = 'P1-{0}%'.format(perc))  
-        plt.plot( [j for (i,j) in prob_attr_2], [i for (i,j) in prob_attr_2], c = next(colour), linestyle='o-', label = 'P2-{0}%'.format(perc))
-
-    plt.title('Probability for transition to each attractor \n of the dynamics if activity starts at value x \n for simulation where nu = {0}, with {1} realisations.'.format(nu, params['realisations']))
-    plt.xlabel('x')
-    plt.ylabel('Probability')
-    plt.legend()
-    plt.show()
+    tpm = transition_probability_matrix(files, nu, step=step)
+    fig, (in_ax, out_ax) = plt.subplots(1, 2)
+    fig.suptitle(r"$\Delta t={0},\ \nu={1}$".format(step, nu))
+    prepare_axes(in_ax, xlabel=r"$Activity$", ylabel=r"$In-degree$")
+    prepare_axes(out_ax, xlabel=r"$Activity$", ylabel=r"$Out-degree$")
+    adj = tpm > 0.
+    out_degs = adj.sum(axis=0)
+    in_degs = adj.sum(axis=1)
+    out_ax.scatter(range(out_degs.size), out_degs)
+    in_ax.scatter(range(in_degs.size), in_degs)
+    plt.show(block=False)
 
 if __name__ == "__main__":
-	### Sequence for generating data for a given patient: ###
-	patient = 'D'
-	# simulate_patient(patient = patient, nus = patient_initial_nus, load_from_first_nu_in_nus = False)
-	# patient_specific_risk_curve(patient = patient, nus = patient_initial_nus, plot = True)
-	# # Define new set of nus, from the final usable nu in the initial set, through the dense set of nus near threshold, 
-	# # and finally to the lowest value of nu below threshold.
-	nus = list(np.linspace(0.14, 0.05, 16))
-	simulate_patient(patient = patient, nus = nus)
-	## patient_specific_risk_curve(patient = patient, nus = nus, plot = True)
-	## # Bifurcation plot
-	# plot_mean_frequency_episodes(patient = patient, nus = patient_initial_nus)
-	# survival_curves_plot(nus=patient_initial_nus)
-
-	#transition_probability_matrix(patient, 0.05,0)
+    simulate_patient('E', nus = [0.1, 0.075, 0.025, 0.2, 0.15], state_file = "Patient-E-100000.0-0.01-0.05/State-0")
+    # activity_time_series('Jacob', 0.5, 0)

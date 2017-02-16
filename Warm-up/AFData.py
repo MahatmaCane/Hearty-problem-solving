@@ -189,14 +189,7 @@ def plot_activity(files):
 
     for fname in glob.glob(files):
         with open(fname, 'r') as fh:
-            time_act = pickle.load(fh)
-            if isinstance(time_act, list):
-                time_act = np.array(time_act)
-            try:
-                activity = time_act[0, :]
-            except IndexError:
-                activity = time_act
-
+            activity = np.genfromtxt(fh)
             ax.plot(activity)
         
     plt.show(block=False)
@@ -209,16 +202,8 @@ def plot_next_activity(fname):
     ax = __prepare_axes(ax) 
 
     with open(fname, 'r') as fh:
-        time_act = pickle.load(fh)
-        if isinstance(time_act, list):
-            time_act = np.array(time_act)
-        try:
-            activity = time_act[0, :]
-        except IndexError:
-            activity = time_act
-
-        ax.scatter(activity[:-1], activity[1:])
-
+        activity = np.genfromtxt(fh)
+    ax.scatter(activity[:-1], activity[1:])
     plt.show(block=False)
 
 def autocorr(series, lag=1):
