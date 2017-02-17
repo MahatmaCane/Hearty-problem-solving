@@ -128,7 +128,7 @@ def simulate_patient(patient, nus, state_file):
     
     for nu in nus:
         for i in range(0, params['realisations']):
-
+            print "Realisation {0}".format(i)
             file_name = "/sim-patient-{2}-nu-{1}-Run-{0}".format(i, nu, patient)
             dump_loc = dirname + file_name
 
@@ -563,19 +563,44 @@ def argand_eigenvalues(filepaths, nu, step=1):
     ax.set_title(r"""$Argand\ Diagram\ of\ TPM\ e'vals,\ \nu={},\ max\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$""".format(nu, eig_with_largest_mod))
     plt.show(block=False)
 
-def plot_mod_eigenvalues(filepaths, nu, step=1, block=False):
+def get_mod_eigs(filepaths, nu, step=1):
 
     tpm = transition_probability_matrix(filepaths, nu, step=step)
     eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
-    eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
+    return eigenvalues, np.absolute(eigenvalues)
+
+def plot_mod_eigenvalues(filepaths, nu, step=1, block=False):
+
+    eigs, mod_eigs = get_mod_eigs(filepaths, nu, step=step)
+    eigenvalue_with_largest_mod = np.max(mod_eigs)
     fig, (ax) = plt.subplots(1, 1)
     ax = prepare_axes(ax, title=r"$\nu = {0}$".format(nu), xlabel=r"$i$",
                       ylabel=r"$\vert \lambda_i \vert$")
-    ax.scatter(range(np.size(eigenvalues)), np.absolute(eigenvalues),
-               c=np.absolute(eigenvalues) == eigenvalue_with_largest_mod,
-               alpha=0.4, linewidths=0)
+    ax.scatter(range(np.size(eigs)), mod_eigs, alpha=0.4, linewidths=0,
+               c = mod_eigs == eigenvalue_with_largest_mod)
     fig.suptitle(r"$\Delta t = {0}$".format(step))
     plt.show(block=block)
+
+def plot_diff_eig_one_eig_two(nu_to_files, step=1):
+
+    """Inputs:
+    
+        - nu_to_files:  dictionary mapping a given nu to corresponding time 
+                        series files."""
+
+    nu_to_diff = dict()
+
+    for nu in nu_to_files.keys():
+        filepaths = nu_to_files[nu]
+        eigs, mod_eigs = get_mod_eigs(filepaths, nu, step=1)
+        max_mod = np.max(mod_eigs)
+        second_max = np.max(mod_eigs[mod_eigs != max_mod])
+        nu_to_diff[nu] = max_mod - second_max
+
+    fig, (ax) = plt.subplots(1, 1)
+    prepare_axes(ax, xlabel=r"$\nu$", ylabel=r"$\lambda_1 - \lambda_2$")
+    ax.scatter(nu_to_diff.keys(), nu_to_diff.values())
+    plt.show(block=False)
 
 def plot_eigenvector_of_largest_eigenvalue(filepaths, nu, step=1):
 
@@ -641,5 +666,5 @@ def plot_degrees_activity(files, nu, step=1):
     plt.show(block=False)
 
 if __name__ == "__main__":
-    simulate_patient('E', nus = [0.1, 0.075, 0.025, 0.2, 0.15], state_file = "Patient-E-100000.0-0.01-0.05/State-0")
+    simulate_patient('E', nus = [0.1421, 0.1422, 0.1423, 0.1424], state_file = "Patient-E-100000.0-0.01-0.05/State-0")
     # activity_time_series('Jacob', 0.5, 0)
