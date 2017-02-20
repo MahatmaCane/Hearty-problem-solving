@@ -7,7 +7,7 @@ from AFModel import Myocardium
 from AFTools import *
 from AF import run
 
-params = dict(realisations = 40, tmax = 1e5, heart_rate = 220, 
+params = dict(realisations = 50, tmax = 10e4, heart_rate = 220, 
               tissue_shape = (200,200), d = 0.01, e = 0.05, 
               refractory_period = 50)
 
@@ -128,7 +128,7 @@ def simulate_patient(patient, nus, state_file):
     
     for nu in nus:
         for i in range(0, params['realisations']):
-            print "Realisation {0}".format(i)
+
             file_name = "/sim-patient-{2}-nu-{1}-Run-{0}".format(i, nu, patient)
             dump_loc = dirname + file_name
 
@@ -147,7 +147,6 @@ def activity_time_series(patient, nu, run):
     file_name = "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, run)
 
     activity = [i for i in np.genfromtxt(dirname + file_name)]
-    #np.genfromtxt(path)
 
     plt.plot(activity)
     plt.show()
@@ -561,7 +560,7 @@ def argand_eigenvalues(filepaths, nu, step=1):
                 c = (np.absolute(eigenvalues) == eig_with_largest_mod))
     ax.grid(True)
     ax.set_title(r"""$Argand\ Diagram\ of\ TPM\ e'vals,\ \nu={},\ max\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$""".format(nu, eig_with_largest_mod))
-    plt.show(block=False)
+    plt.show()
 
 def get_mod_eigs(filepaths, nu, step=1):
 
@@ -665,6 +664,65 @@ def plot_degrees_activity(files, nu, step=1):
     in_ax.scatter(range(in_degs.size), in_degs)
     plt.show(block=False)
 
+
+def get_eig_vals_vecs(filepaths, nu, step=1):
+
+    tpm = transition_probability_matrix(filepaths, nu, step=step)
+    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
+    return eigenvalues, eigenvector_matrix
+
+def get_eig_val_and_associated_vec(rank, filepaths, nu, step=1):
+
+    eigenvalues, eigenvector_matrix = get_eig_vals_vecs(filepaths, nu)
+    evalues = [i for i in eigenvalues]
+    evalues.sort()
+    evalues.reverse()
+    eigval = eigenvalues[rank-1]
+    eigvec = eigenvector_matrix[:, [i for i in eigenvalues].index(eigval)]
+    return eigval, eigvec
+
+def plot_eigenvector(rank, filepaths, nu, step=1):
+
+    eigval, eigvec = get_eig_val_and_associated_vec(rank, filepaths, nu, step=1)
+    fig, (real_ax, imag_ax) = plt.subplots(1, 2)
+    real_ax.scatter(range(np.size(eigvec)), eigvec.real, linewidths=0, alpha=0.4)
+    imag_ax.scatter(range(np.size(eigvec)), eigvec.imag, linewidths=0, alpha=0.4)
+    real_ax.grid(True)
+    imag_ax.grid(True)
+    fig.suptitle(r"$\Delta t={0},\ \nu = {1}$".format(step, nu))
+    real_ax.set_title(r"$Re(eig'vector\ of\ largest\ eig'value)$")
+    imag_ax.set_title(r"$Im(eig'vector\ of\ largest\ eig'value)$")
+    plt.show()
+
+def get_diff_eig_vals(i,j, filepaths, nu, step=1):
+
+    eigval1, eigvec1 = get_eig_val_and_associated_vec(i, filepaths, nu)
+    eigval2, eigvec2 = get_eig_val_and_associated_vec(j, filepaths, nu)
+
+    return np.absolute(eigval1 - eigval2)
+
+def plot_diff_eigvals_vs_nu(i,j, patient, nus):
+    
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    
+    eigval_diffs = []
+    for nu in nus:
+        file_name = "/sim-patient-{0}-nu-{1}-Run-*".format(patient, nu)
+        filepaths = dirname + file_name
+        eigval_diffs.append( get_diff_eig_vals(i,j, filepaths, nu) )
+    
+    plt.plot(nus, eigval_diffs, 'o')
+    plt.xlabel(r"$\nu$")
+    plt.ylabel(r"$\Delta$"+" $\lamda_{0} - \lambda_{1}$".format(i,j))
+    plt.show()
+
 if __name__ == "__main__":
-    simulate_patient('E', nus = [0.1421, 0.1422, 0.1423, 0.1424], state_file = "Patient-E-100000.0-0.01-0.05/State-0")
-    # activity_time_series('Jacob', 0.5, 0)
+    # simulate_patient('Gweno', [ 0.16, 0.14 ,0.12 ,0.1 ,0.08 ,0.06 ], None)
+    nu, i, patient = 0.14, 0, 'Gweno'
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    file_name = "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, i)
+    
+    # activity_time_series(patient, nu, i)
+    # argand_eigenvalues(dirname + "/sim-patient-{0}-nu-{1}-Run-*".format(patient,nu), nu, step=1)
+    # plot_eigenvector(2, dirname  + "/sim-patient-{0}-nu-{1}-Run-*".format(patient,nu), nu )
+    plot_diff_eigvals_vs_nu(1,2, patient, [0.16,0.14,0.12,0.1,0.08,0.06])
