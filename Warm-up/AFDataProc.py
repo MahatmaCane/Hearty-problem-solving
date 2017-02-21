@@ -674,11 +674,11 @@ def get_eig_vals_vecs(filepaths, nu, step=1):
 def get_eig_val_and_associated_vec(rank, filepaths, nu, step=1):
 
     eigenvalues, eigenvector_matrix = get_eig_vals_vecs(filepaths, nu)
-    evalues = [i for i in eigenvalues]
+    evalues = [np.absolute(i) for i in eigenvalues]
     evalues.sort()
     evalues.reverse()
     eigval = eigenvalues[rank-1]
-    eigvec = eigenvector_matrix[:, [i for i in eigenvalues].index(eigval)]
+    eigvec = eigenvector_matrix[:, [np.absolute(i) for i in eigenvalues].index(eigval)]
     return eigval, eigvec
 
 def plot_eigenvector(rank, filepaths, nu, step=1):
@@ -712,17 +712,23 @@ def plot_diff_eigvals_vs_nu(i,j, patient, nus):
         eigval_diffs.append( get_diff_eig_vals(i,j, filepaths, nu) )
     
     plt.plot(nus, eigval_diffs, 'o')
+    plt.title("Difference between eigenvalues of rank {0} and {1} for {2} as a function of".format(i,j,patient) +r" $\nu$")
     plt.xlabel(r"$\nu$")
-    plt.ylabel(r"$\Delta$"+" $\lamda_{0} - \lambda_{1}$".format(i,j))
+    plt.ylabel(r"$\Delta$"+" $\lambda_{0} - \lambda_{1}$".format(i,j))
     plt.show()
 
 if __name__ == "__main__":
     # simulate_patient('Gweno', [ 0.16, 0.14 ,0.12 ,0.1 ,0.08 ,0.06 ], None)
-    nu, i, patient = 0.14, 0, 'Gweno'
-    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
-    file_name = "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, i)
+
+    # nus = [0.4,0.18, 0.16,0.1575, 0.155,0.1525, 0.15125, 0.15,0.14875, 0.1475, 0.145, 0.14,0.12,0.1,0.08,0.06]
+    # nu, i, patient = 0.14875, 4, 'Gweno'
+    # dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    # file_name = "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, i)
     
+    # state_file = dirname + "/State-0"
+    # simulate_patient('Gweno', [ 0.7,1 ], state_file)
+
     # activity_time_series(patient, nu, i)
     # argand_eigenvalues(dirname + "/sim-patient-{0}-nu-{1}-Run-*".format(patient,nu), nu, step=1)
     # plot_eigenvector(2, dirname  + "/sim-patient-{0}-nu-{1}-Run-*".format(patient,nu), nu )
-    plot_diff_eigvals_vs_nu(1,2, patient, [0.16,0.14,0.12,0.1,0.08,0.06])
+    # plot_diff_eigvals_vs_nu(1,4, patient, [0.18, 0.16,0.1575, 0.155,0.1525, 0.15125, 0.15,0.14875, 0.1475, 0.145, 0.14,0.12,0.1,0.08,0.06])
