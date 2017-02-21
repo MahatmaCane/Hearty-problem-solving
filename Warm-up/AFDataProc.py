@@ -677,7 +677,7 @@ def get_eig_val_and_associated_vec(rank, filepaths, nu, step=1):
     evalues = [np.absolute(i) for i in eigenvalues]
     evalues.sort()
     evalues.reverse()
-    eigval = eigenvalues[rank-1]
+    eigval = evalues[rank-1]
     eigvec = eigenvector_matrix[:, [np.absolute(i) for i in eigenvalues].index(eigval)]
     return eigval, eigvec
 
@@ -720,7 +720,7 @@ def plot_diff_eigvals_vs_nu(i,j, patient, nus):
 if __name__ == "__main__":
     # simulate_patient('Gweno', [ 0.16, 0.14 ,0.12 ,0.1 ,0.08 ,0.06 ], None)
 
-    # nus = [0.4,0.18, 0.16,0.1575, 0.155,0.1525, 0.15125, 0.15,0.14875, 0.1475, 0.145, 0.14,0.12,0.1,0.08,0.06]
+    # Gweno_nus = [0.4,0.18, 0.16,0.1575, 0.155,0.1525, 0.15125, 0.15,0.14875, 0.1475, 0.145, 0.14,0.12,0.1,0.08,0.06]
     # nu, i, patient = 0.14875, 4, 'Gweno'
     # dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
     # file_name = "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, i)
@@ -731,4 +731,4 @@ if __name__ == "__main__":
     # activity_time_series(patient, nu, i)
     # argand_eigenvalues(dirname + "/sim-patient-{0}-nu-{1}-Run-*".format(patient,nu), nu, step=1)
     # plot_eigenvector(2, dirname  + "/sim-patient-{0}-nu-{1}-Run-*".format(patient,nu), nu )
-    # plot_diff_eigvals_vs_nu(1,4, patient, [0.18, 0.16,0.1575, 0.155,0.1525, 0.15125, 0.15,0.14875, 0.1475, 0.145, 0.14,0.12,0.1,0.08,0.06])
+    # plot_diff_eigvals_vs_nu(1,2, patient, Gweno_nus)
