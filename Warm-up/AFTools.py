@@ -1,3 +1,5 @@
+import glob
+import os
 import numpy as np
 import pickle
 
@@ -93,9 +95,12 @@ class Loader:
             self.state = pickle.load(fh)
         return self.state
 
-    def file_len(self, fname):
+def get_nus(directory):
 
-        with open(fname) as f:
-            for i, l in enumerate(f):
-                pass
-        return i + 1
+    """Input: patient or directory? I think directory."""
+    nus = set()
+    for fname in glob.glob(directory + "/sim-*"):
+        nu = fname.split("-")[8]
+        nus.add(float(nu))
+
+    return sorted(nus)

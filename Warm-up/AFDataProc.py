@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 from AFModel import Myocardium
 from AFTools import *
 from AF import run
+from TPM import TPM
 
-params = dict(realisations = 50, tmax = 10e4, heart_rate = 220, 
+params = dict(realisations = 40, tmax = 10e4, heart_rate = 220, 
               tissue_shape = (200,200), d = 0.01, e = 0.05, 
               refractory_period = 50)
 
@@ -141,14 +142,72 @@ def simulate_patient(patient, nus, state_file):
 
 #### Time Series ####
 
-def activity_time_series(patient, nu, run):
+def activity_time_series(patient, nu, run, fancy = False):
     
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
     file_name = "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, run)
 
+    threshold = params['tissue_shape'][0]+0.05*params['tissue_shape'][0]
     activity = [i for i in np.genfromtxt(dirname + file_name)]
 
-    plt.plot(activity)
+    if fancy == True:
+        transition_times = []
+        t = 0
+        try: 
+            while True:
+                t_enters = enters_fib(t, activity, threshold)
+                transition_times.append(t_enters)
+
+                t_leaves = leaves_fib(t_enters, activity, threshold)
+                transition_times.append(t_leaves)
+
+                if type(t_enters) == type(None):
+                    print "t_enters FAILED"
+                elif type(t_leaves) == type(None):
+                    print "t_leaves FAILED"
+
+                t = t_leaves
+
+        except IndexError:
+            try: 
+                # Simulation terminates in fib.
+                t_enters = enters_fib(t, activity, threshold)
+                transition_times.append(t_enters)
+
+            except IndexError:
+                #Simulation terminates in Sinus rhythm
+                pass
+        except ValueError:
+            #Sim enters fib within last two heartbeats of simulation
+            pass
+
+        b = 0
+        counter = 1
+
+        fig, (ax) = plt.subplots(1, 1)
+        ax.plot(activity[:transition_times[0]], c = 'k', label = 'Sinus Rhythm')
+
+        for i in range(1, 13):#len(transition_times[:13])):
+
+            if b == 0:
+                if i == 1:
+                    ax.plot(range(transition_times[i-1],transition_times[i]), activity[transition_times[i-1]:transition_times[i]], color='orangered', label = 'Fibrillating')
+                    b = 1
+                elif i !=1:
+                    ax.plot(range(transition_times[i-1],transition_times[i]), activity[transition_times[i-1]:transition_times[i]], color='orangered')
+                    b = 1
+            elif b == 1:
+                ax.plot(range(transition_times[i-1],transition_times[i]), activity[transition_times[i-1]:transition_times[i]], c = 'k')
+                b = 0
+
+    elif fancy == False:
+        fig, (ax) = plt.subplots(1, 1)
+        ax.plot(activity, label = 'Patitnet: {0}'.format(patient))
+    plt.xlabel("Time, $t$")
+    plt.ylabel("Activity, $\mathcal{A}$")
+    plt.legend()
+    plt.grid()
+    # plt.xlim([0,12400])
     plt.show()
 
 #### Determining Critical Threshold - Risk Curve ####
@@ -477,258 +536,5 @@ def survival_curves_plot(nus):
               ncol=6, fancybox=True, shadow=True)
     plt.show()
 
-#### Transition probability matrix ####
-
-def transition_probability_matrix(filepaths, nu, step=1, plot=False):
-
-    """Construct the transition probability matrix from multiple realisations
-       of a given myocardium.
-
-       Inputs:
-        - filepaths:    paths to files containing time series'. str or list.
-        - nu (float):   fraction of transversal couplings present.
-        - step (int):   transition matrix produced is the probability of being
-                        at some activity after `step' time steps given that it
-                        is at some activity. Default 1.
-        - plot (bool):  plot matrix if True. Default False.
-
-        Output:
-        - trans_prob (np.ndarray), the transition probability matrix."""
-
-    tpm_loc = os.path.dirname(filepaths) + "/TPM-{}.npy".format(nu)
-
-    # Check to see if exists in directory already
-    if not os.path.exists(tpm_loc):
-
-        print "File {0} does not exist. Creating.".format(tpm_loc)
-        activities = dict()
-
-        dim = None
-        for fname in glob.glob(filepaths):
-            activity = np.genfromtxt(fname)
-            # +1 ensures that matrix dimensions allow activity values of 0 and dim
-            this_max_act = np.max(activity) + 1
-            if dim is None:
-                dim = this_max_act
-            elif this_max_act > dim:
-                dim = this_max_act
-            activities[fname] = activity
-
-        H = None
-        for activity in activities.values():
-            x = activity[:-step]
-            y = activity[step:]
-            (hist, xe, ye) = np.histogram2d(x, y, bins=(dim, dim),
-                                            range=[[0, dim],[0, dim]])
-            if H is None:
-                H = hist
-            else:
-                H += hist
-
-        # Normalise
-        normalisation = np.sum(H, axis=0, dtype=np.float64)
-        normalisation[normalisation == 0.] = 1.
-        trans_prob = H/normalisation
-        np.save(tpm_loc, trans_prob)
-
-    else:
-        print "File exists"
-        trans_prob = np.load(tpm_loc)
-
-    if plot == True:
-        fig, (ax) = plt.subplots(1, 1)
-        tit = r"$Stochastic\ matrix,\ \nu={0}, \Delta t={1}$".format(nu, step)
-        prepare_axes(ax, xlabel=r"$a(t+1)$", ylabel=r"$a(t)$",
-                     title=tit)
-        ax.pcolorfast(trans_prob, cmap = "Greys_r")
-        plt.show(block=False)
-
-    return trans_prob
-
-def argand_eigenvalues(filepaths, nu, step=1):
-
-    """Construct transition probability matrix and plot Argand diagram of
-       eigenvalues. See transition_probability_matrix for info on first three
-       input params."""
-
-    tpm = transition_probability_matrix(filepaths, nu, step=step)
-    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
-    eig_with_largest_mod = np.max(np.absolute(eigenvalues))
-    fig, (ax) = plt.subplots(1, 1)
-    fig.suptitle(r"$\Delta t = {0}$".format(step))
-    ax.scatter(eigenvalues.real, eigenvalues.imag, alpha=0.5, linewidths=0,
-                c = (np.absolute(eigenvalues) == eig_with_largest_mod))
-    ax.grid(True)
-    ax.set_title(r"""$Argand\ Diagram\ of\ TPM\ e'vals,\ \nu={},\ max\lbrace \vert \lambda_i \vert \rbrace = {:.17f}$""".format(nu, eig_with_largest_mod))
-    plt.show()
-
-def get_mod_eigs(filepaths, nu, step=1):
-
-    tpm = transition_probability_matrix(filepaths, nu, step=step)
-    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
-    return eigenvalues, np.absolute(eigenvalues)
-
-def plot_mod_eigenvalues(filepaths, nu, step=1, block=False):
-
-    eigs, mod_eigs = get_mod_eigs(filepaths, nu, step=step)
-    eigenvalue_with_largest_mod = np.max(mod_eigs)
-    fig, (ax) = plt.subplots(1, 1)
-    ax = prepare_axes(ax, title=r"$\nu = {0}$".format(nu), xlabel=r"$i$",
-                      ylabel=r"$\vert \lambda_i \vert$")
-    ax.scatter(range(np.size(eigs)), mod_eigs, alpha=0.4, linewidths=0,
-               c = mod_eigs == eigenvalue_with_largest_mod)
-    fig.suptitle(r"$\Delta t = {0}$".format(step))
-    plt.show(block=block)
-
-def plot_diff_eig_one_eig_two(nu_to_files, step=1):
-
-    """Inputs:
-    
-        - nu_to_files:  dictionary mapping a given nu to corresponding time 
-                        series files."""
-
-    nu_to_diff = dict()
-
-    for nu in nu_to_files.keys():
-        filepaths = nu_to_files[nu]
-        eigs, mod_eigs = get_mod_eigs(filepaths, nu, step=1)
-        max_mod = np.max(mod_eigs)
-        second_max = np.max(mod_eigs[mod_eigs != max_mod])
-        nu_to_diff[nu] = max_mod - second_max
-
-    fig, (ax) = plt.subplots(1, 1)
-    prepare_axes(ax, xlabel=r"$\nu$", ylabel=r"$\lambda_1 - \lambda_2$")
-    ax.scatter(nu_to_diff.keys(), nu_to_diff.values())
-    plt.show(block=False)
-
-def plot_eigenvector_of_largest_eigenvalue(filepaths, nu, step=1):
-
-    tpm = transition_probability_matrix(filepaths, nu, step=step)
-    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
-    eig_with_largest_mod = np.max(np.absolute(eigenvalues))
-    column_index = np.where(np.absolute(eigenvalues) == eig_with_largest_mod)
-    vec = eigenvector_matrix[:, column_index]
-    if np.sum(vec) <= 0.:
-        vec *= -1
-    fig, (real_ax, imag_ax) = plt.subplots(1, 2)
-    real_ax.scatter(range(np.size(vec)), vec.real, linewidths=0, alpha=0.4)
-    imag_ax.scatter(range(np.size(vec)), vec.imag, linewidths=0, alpha=0.4)
-    real_ax.grid(True)
-    imag_ax.grid(True)
-    fig.suptitle(r"$\Delta t={0},\ \nu = {1}$".format(step, nu))
-    real_ax.set_title(r"$Re(eig'vector\ of\ largest\ eig'value)$")
-    imag_ax.set_title(r"$Im(eig'vector\ of\ largest\ eig'value)$")
-    plt.show(block=False)
-
-def plot_eigenvector_matrix(filepaths, nu, step=1):
-
-    tpm = transition_probability_matrix(filepaths, nu, step=step)
-    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
-    fig, (real_ax, imag_ax) = plt.subplots(1, 2)
-    real_im = real_ax.imshow(eigenvector_matrix.real, cmap="RdBu_r")
-    fig.colorbar(real_im)
-    imag_im = imag_ax.imshow(eigenvector_matrix.imag, cmap="RdBu_r")
-    fig.colorbar(imag_im)
-    plt.show(block=False)
-
-def plot_second_eigenvector(filepaths, nu, step=1):
-
-    tpm = transition_probability_matrix(filepaths, nu, step=step)
-    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
-    fig, (real_ax, imag_ax) = plt.subplots(1, 2)
-    eigenvalue_with_largest_mod = np.max(np.absolute(eigenvalues))
-    others = [n for n in list(eigenvalues) if abs(n)!=eigenvalue_with_largest_mod]
-    column_index = np.where(np.absolute(eigenvalues) == max(others))
-    vector = eigenvector_matrix[:, column_index]
-    fig, (real_ax, imag_ax) = plt.subplots(1, 2)
-    real_ax.scatter(range(np.size(vector)), vector.real, linewidths=0, alpha=0.4)
-    imag_ax.scatter(range(np.size(vector)), vector.imag, linewidths=0, alpha=0.4)
-    real_ax.grid(True)
-    imag_ax.grid(True)
-    fig.suptitle(r"$\vert \lambda_i \vert = {:.17f}$".format(max(others)))
-    real_ax.set_title(r"$Real\ part\ of\ elements\ of\ eigenvector\ with\ second\ largest\ eigenvalue,\ \nu = {0}, \Delta t = {1}$".format(nu, step))
-    imag_ax.set_title(r"$Imaginary\ part\ of\ elements\ of\ eigenvector\ with\ second\ largest\ eigenvalue,\ \nu = {0}, \Delta t = {1}$".format(nu, step))
-    plt.show(block=False)
-
-def plot_degrees_activity(files, nu, step=1):
-
-    tpm = transition_probability_matrix(files, nu, step=step)
-    fig, (in_ax, out_ax) = plt.subplots(1, 2)
-    fig.suptitle(r"$\Delta t={0},\ \nu={1}$".format(step, nu))
-    prepare_axes(in_ax, xlabel=r"$Activity$", ylabel=r"$In-degree$")
-    prepare_axes(out_ax, xlabel=r"$Activity$", ylabel=r"$Out-degree$")
-    adj = tpm > 0.
-    out_degs = adj.sum(axis=0)
-    in_degs = adj.sum(axis=1)
-    out_ax.scatter(range(out_degs.size), out_degs)
-    in_ax.scatter(range(in_degs.size), in_degs)
-    plt.show(block=False)
-
-
-def get_eig_vals_vecs(filepaths, nu, step=1):
-
-    tpm = transition_probability_matrix(filepaths, nu, step=step)
-    eigenvalues, eigenvector_matrix = np.linalg.eig(tpm)
-    return eigenvalues, eigenvector_matrix
-
-def get_eig_val_and_associated_vec(rank, filepaths, nu, step=1):
-
-    eigenvalues, eigenvector_matrix = get_eig_vals_vecs(filepaths, nu)
-    evalues = [np.absolute(i) for i in eigenvalues]
-    evalues.sort()
-    evalues.reverse()
-    eigval = evalues[rank-1]
-    eigvec = eigenvector_matrix[:, [np.absolute(i) for i in eigenvalues].index(eigval)]
-    return eigval, eigvec
-
-def plot_eigenvector(rank, filepaths, nu, step=1):
-
-    eigval, eigvec = get_eig_val_and_associated_vec(rank, filepaths, nu, step=1)
-    fig, (real_ax, imag_ax) = plt.subplots(1, 2)
-    real_ax.scatter(range(np.size(eigvec)), eigvec.real, linewidths=0, alpha=0.4)
-    imag_ax.scatter(range(np.size(eigvec)), eigvec.imag, linewidths=0, alpha=0.4)
-    real_ax.grid(True)
-    imag_ax.grid(True)
-    fig.suptitle(r"$\Delta t={0},\ \nu = {1}$".format(step, nu))
-    real_ax.set_title(r"$Re(eig'vector\ of\ largest\ eig'value)$")
-    imag_ax.set_title(r"$Im(eig'vector\ of\ largest\ eig'value)$")
-    plt.show()
-
-def get_diff_eig_vals(i,j, filepaths, nu, step=1):
-
-    eigval1, eigvec1 = get_eig_val_and_associated_vec(i, filepaths, nu)
-    eigval2, eigvec2 = get_eig_val_and_associated_vec(j, filepaths, nu)
-
-    return np.absolute(eigval1 - eigval2)
-
-def plot_diff_eigvals_vs_nu(i,j, patient, nus):
-    
-    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
-    
-    eigval_diffs = []
-    for nu in nus:
-        file_name = "/sim-patient-{0}-nu-{1}-Run-*".format(patient, nu)
-        filepaths = dirname + file_name
-        eigval_diffs.append( get_diff_eig_vals(i,j, filepaths, nu) )
-    
-    plt.plot(nus, eigval_diffs, 'o')
-    plt.title("Difference between eigenvalues of rank {0} and {1} for {2} as a function of".format(i,j,patient) +r" $\nu$")
-    plt.xlabel(r"$\nu$")
-    plt.ylabel(r"$\Delta$"+" $\lambda_{0} - \lambda_{1}$".format(i,j))
-    plt.show()
-
 if __name__ == "__main__":
-    # simulate_patient('Gweno', [ 0.16, 0.14 ,0.12 ,0.1 ,0.08 ,0.06 ], None)
-
-    # Gweno_nus = [0.4,0.18, 0.16,0.1575, 0.155,0.1525, 0.15125, 0.15,0.14875, 0.1475, 0.145, 0.14,0.12,0.1,0.08,0.06]
-    # nu, i, patient = 0.14875, 4, 'Gweno'
-    # dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
-    # file_name = "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, i)
-    
-    # state_file = dirname + "/State-0"
-    # simulate_patient('Gweno', [ 0.7,1 ], state_file)
-
-    # activity_time_series(patient, nu, i)
-    # argand_eigenvalues(dirname + "/sim-patient-{0}-nu-{1}-Run-*".format(patient,nu), nu, step=1)
-    # plot_eigenvector(2, dirname  + "/sim-patient-{0}-nu-{1}-Run-*".format(patient,nu), nu )
-    # plot_diff_eigvals_vs_nu(1,2, patient, Gweno_nus)
+    pass
