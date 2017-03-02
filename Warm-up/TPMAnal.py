@@ -75,10 +75,10 @@ def plot_eigenvector(rank, filepaths, nu, step=1):
     imag_ax.set_title(r"$Im(eig'vector\ of\ largest\ eig'value)$")
     plt.show()
 
-def plot_diff_eigvals_vs_nu(i,j, patient, nus):
+def plot_diff_eigvals_vs_nu(i,j, patient):
     
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
-    
+    nus = get_nus(dirname + '/')
     eigval_diffs = []
     for nu in nus:
         file_name = "/sim-patient-{0}-nu-{1}-Run-*".format(patient, nu)
@@ -86,7 +86,7 @@ def plot_diff_eigvals_vs_nu(i,j, patient, nus):
         tpm = TPM(filepaths, nu, step = 1)
         eigval_diffs.append( tpm.get_diff_absolute_eig_vals(i,j) )
     
-    plt.plot(nus, eigval_diffs, 'o')
+    plt.plot(nus, eigval_diffs, 'o-')
     plt.title("Difference between eigenvalues of rank {0} and {1} for {2} as a function of".format(i,j,patient) +r" $\nu$")
     plt.xlabel(r"$\nu$")
     plt.ylabel(r"$\Delta$"+" $\lambda_{0} - \lambda_{1}$".format(i,j))
@@ -143,4 +143,27 @@ def compute_baseline(patient, min_safe_nu = 0.6):
     
     return np.mean(eigval_diffs)
 
+def basline_change_indicator(patient, thresh = 0.0005, delta_nu = 0.05):
+    """ Computes the value of nu at which the data points first cross the threshold,
+        which is defined as a percentage increase, thresh, above the baseline. """
 
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    nus, eigval_diffs = compute_eigval_diffs(patient,dirname)
+    nus.reverse()
+    eigval_diffs.reverse()							
+    baseline = compute_baseline(patient)
+    max_change = baseline + thresh*baseline
+
+    for nu in nus:    #High to low
+        i = nus.index(nu)
+        if eigval_diffs[i] > max_change:
+            if nus[i] - nus[i-1] > delta_nu:
+                print "Not enough data points between nu = {0} and nu = {1}".format(nus[i],nus[i-1])
+                return
+            for nu1 in nus[i:]:
+                j = nus.index(nu1)
+                if np.absolute(eigval_diffs[j] - eigval_diffs[j-1]) > float(baseline)/2: #If there is a sudden drop in nu
+                    nu_till_transition = np.absolute(nus[j-1] - nu)
+                    return nu, nu_till_transition
+    print "Change not detected."
+    return 
