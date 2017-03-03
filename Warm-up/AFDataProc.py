@@ -345,7 +345,7 @@ def patient_specific_risk_curve(patient = 'A', nus = [], plot = True):
 
 #### Bifurcation of States ####
 
-# Functions for generating plot showing bifurcation of states for both a given patient at some nu and at multiplie values of nu.
+# Call basins_same_axes(files, nu, avg=False) from AFData.py
 
 #### Flickering ####
 
@@ -443,7 +443,7 @@ def gen_survival_curve_data(patient, nu, realisations):
         print "Working on realisation: ", i
         # print("Episodes counted:", episodes_counted)
         try:
-            file_name = "/sim-patient-{0}-nu-{1}-Run-{0}".format(patient, nu, i)
+            file_name = "/sim-patient-{0}-nu-{1}-Run-{2}".format(patient, nu, i)
             activity = [i for i in np.genfromtxt(dirname + file_name)]
 
         except:
@@ -501,11 +501,10 @@ def gen_survival_curve_data(patient, nu, realisations):
         # Converting times_spent_in_fib to probability list:
         P = [float(i)/episodes_counted for i in times_spent_in_fib]
 
-        out_loc = dirname + subdirname +'/{0}-{1}'.format(nu, realisations)
-        with open(out_loc, 'w') as fh:
-            pickle.dump(P, fh)
+        out_loc = dirname + subdirname +'-{0}-{1}.npy'.format(nu, realisations)
+        np.save(out_loc, P)
 
-def survival_curves_plot(nus):
+def survival_curves_plot(patient, nus):
 
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
     subdirname = '/Survival-Curve'
@@ -519,16 +518,13 @@ def survival_curves_plot(nus):
     colour=iter(plt.cm.brg(np.linspace(0,0.9,n)))
 
     for nu in nus:
-
-        try:
-            with open(dirname + subdirname +'/{0}-{1}'.format(nu, realisations), 'r') as fh:
-                P = pickle.load(fh)
-            print("Succesfully loaded survival curve for nu = ", nu)
-        except:
-            print("Generating survival curve for nu = ", nu)
-            gen_survival_curve_data(nu, realisations)
-            with open(dirname + subdirname +'/{0}-{1}'.format(nu, realisations), 'r') as fh:
-                P = pickle.load(fh)
+        surv_curve_loc = dirname + subdirname +'-{0}-{1}.npy'.format(nu, realisations)
+        if not os.path.exists(surv_curve_loc):
+            print "File {0} doesn't exist. Creating".format(surv_curve_loc)
+            gen_survival_curve_data(patient, nu, realisations)
+            P = np.load(surv_curve_loc)
+        else:
+            P = np.load(surv_curve_loc)
         c = next(colour)
         ax.plot([i for i in range(0,len(P))], P, c=c, label = r' $\nu =$'+'${0}$'.format(nu))
 

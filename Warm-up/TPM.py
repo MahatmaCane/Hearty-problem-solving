@@ -35,7 +35,7 @@ class TPM():
                 elif this_max_act > dim:
                     dim = this_max_act
                 activities[fname] = activity
-
+            
             H = None
             for activity in activities.values():
                 x = activity[:-self.step]
@@ -99,7 +99,6 @@ class TPM():
 
     def get_diff_absolute_eig_vals(self, i, j):
     	""" Method to obtain the absolute difference between eigenvalues of rank i and j. """
-    	##### Should this be np.absolute(eigval1) - np.absolute(eigval2)? #####
 
     	eigval1, eigvec1 = self.get_eig_val_and_associated_vec(i)
         eigval2, eigvec2 = self.get_eig_val_and_associated_vec(j)
@@ -116,3 +115,12 @@ class TPM():
         plt.ylabel(r"$a(t)$")
         plt.colorbar(orientation='vertical')
         plt.show()
+
+    def test_linear_independence_of_evecs(self):
+    	""" The eigenvectors of any homogenous matrix are 
+    	    linearly independent if its determinant is non-zero. """
+        det = np.linalg.det(self.tpm)
+        if det == 0:
+        	return False
+        if det != 0:
+        	return True

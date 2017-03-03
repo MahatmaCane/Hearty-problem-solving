@@ -108,6 +108,9 @@ def plot_diff_eigvals_multi_patient(rank_diff = [], patients = []):
     	print "Must include more than 1 patient"
     	return
 
+    k = 0
+    alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','Z','W','X','Y','Z']
+    
     for patient in patients:
     	dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
         nus = get_nus(dirname)
@@ -119,11 +122,8 @@ def plot_diff_eigvals_multi_patient(rank_diff = [], patients = []):
                 tpm = TPM(filepaths,nu,step = 1)
                 eigval_diffs.append( tpm.get_diff_absolute_eig_vals(i,j) )
 
-            alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','Z','W','X','Y','Z']
-            
-            for k in range(0,len(patients)-1):
-                if patient == patients[i]:
-                    plt.plot(nus, eigval_diffs, 'o', label = 'Patient {0}, (m,n) = ({1},{2})'.format(alphabet[i], i,j))
+            plt.plot(nus, eigval_diffs, 'o-', label = 'Patient {0}, (m,n) = ({1},{2})'.format(alphabet[k], i,j))
+            k += 1
 
     plt.legend( bbox_to_anchor=(1.005 , 1), loc=2, borderaxespad=0., fancybox=True, shadow=True, fontsize = 22)
     # plt.title("Difference between eigenvalues of specified rank as a function of" +r" $\nu$", fontsize = 22)
@@ -143,7 +143,7 @@ def compute_baseline(patient, min_safe_nu = 0.6):
     
     return np.mean(eigval_diffs)
 
-def basline_change_indicator(patient, thresh = 0.0005, delta_nu = 0.05):
+def baseline_change_indicator(patient, thresh = 0.0005, delta_nu = 0.05):
     """ Computes the value of nu at which the data points first cross the threshold,
         which is defined as a percentage increase, thresh, above the baseline. """
 
@@ -167,3 +167,5 @@ def basline_change_indicator(patient, thresh = 0.0005, delta_nu = 0.05):
                     return nu, nu_till_transition
     print "Change not detected."
     return 
+
+
