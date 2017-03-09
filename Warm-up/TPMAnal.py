@@ -6,8 +6,13 @@ import matplotlib.pyplot as plt
 from AFTools import *
 from TPM import TPM
 
+import matplotlib as mpl
+label_size = 14
+mpl.rcParams['xtick.labelsize'] = label_size
+mpl.rcParams['ytick.labelsize'] = label_size 
+
 params = dict(realisations = 40, tmax = 10e4, heart_rate = 220, 
-              tissue_shape = (200,200), d = 0.01, e = 0.05, 
+              tissue_shape = (200,200), d = 0.05 , e = 0.05, 
               refractory_period = 50)
 
 def argand_eigenvalues(filepaths, nu, step=1):
@@ -111,8 +116,14 @@ def plot_diff_eigvals_multi_patient(rank_diff = [], patients = []):
     k = 0
     alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','Z','W','X','Y','Z']
     
+    delta1 = ['A','C','E','G', 'H']
+    delta5 = ['I','J','K']
+
     for patient in patients:
-    	dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    	if patient in delta1:
+    	    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], 0.01, params['e'])
+    	elif patient in delta5:
+    		dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], 0.05, params['e'])
         nus = get_nus(dirname)
         for (i,j) in rank_diff:
             eigval_diffs = []
@@ -168,4 +179,20 @@ def baseline_change_indicator(patient, thresh = 0.0005, delta_nu = 0.05):
     print "Change not detected."
     return 
 
+def plot_rank_change(patient):
+    """ Plot showing how the rank of the TPM changes with nu"""
+    
+    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+    nus = get_nus(dirname + '/')
+    ranks = []
+    for nu in nus:
+        file_name = "/sim-patient-{0}-nu-{1}-Run-*".format(patient, nu)
+        filepaths = dirname + file_name
+        tpm = TPM(filepaths, nu, step = 1)
+        ranks.append(tpm.get_rank())
 
+    plt.plot(nus, ranks, 'o-')
+    # plt.title()
+    plt.xlabel(r"$\nu$", fontsize = 22, labelpad = 17)
+    plt.ylabel("rank of transition probability matrix", fontsize = 22, labelpad = 17)
+    plt.show()
