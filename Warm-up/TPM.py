@@ -124,3 +124,31 @@ class TPM():
         	return False
         if det != 0:
         	return True
+
+    def get_rank(self):
+        return np.linalg.matrix_rank(self.tpm)
+
+    def qr_decomposition(self, output = 'r', show = False):
+        """
+        q: A matrix with orthonormal columns
+        r: The upper-triangular matrix (has same rank as TPM)
+        """
+        q, r = np.linalg.qr(self.tpm, mode = 'complete')
+        
+        if show == True:
+            fig = plt.figure(figsize=(6, 3.2))
+            ax = fig.add_subplot(111)
+            ax.set_title('colorMap')
+            if output == 'r': 
+                plt.imshow(r)
+                plt.title("r matrix (same rank as TPM) \n from QR decomposition of TPM \n "+r"$\nu = {0}$".format(self.nu))
+            elif output == 'q':
+            	plt.imshow(q)
+            	plt.title("q matrix (orthonormal columns) \n from QR decomposition of TPM \n "+r"$\nu = {0}$".format(self.nu))
+            plt.colorbar(orientation='vertical')
+            plt.show()
+
+        if output == 'r':
+        	return r
+        if output == 'q':
+        	return q
