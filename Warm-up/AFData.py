@@ -2,9 +2,12 @@ import glob
 import numpy as np
 import pickle
 import pandas as pd
-
+from TPM import TPM
 from matplotlib import pyplot as plt
-
+import matplotlib as mpl
+label_size = 14
+mpl.rcParams['xtick.labelsize'] = label_size 
+mpl.rcParams.update({'font.size': 22})
 
 class Basin:
 
@@ -37,6 +40,7 @@ class Basin:
         return """Basin:
                     Lower  - {0}
                     Upper  - {1}""".format(self.bounds[0], self.bounds[1])
+
 
 class Averager:
 
@@ -82,7 +86,7 @@ def find_time_at_activity(data):
         activity = time_act[0, :]
     except IndexError:
         activity = time_act
-    time_at_activity = np.bincount(activity) / float(activity.size)
+    time_at_activity = np.bincount([int(i) for i in activity]) / float(activity.size)
 
     return time_at_activity
 
@@ -125,6 +129,38 @@ def basins_same_axes(files, nu, avg=False):
         avg_ax.plot(averager.avgd_data)
 
     plt.show(block=False)
+
+
+def plot_avg_occupancy_density(files, nu, avg=False):
+
+    """ Plot average occupancy density for simulations at a given nu."""
+
+    ax = plt.gca()
+    y_label = "Mean fraction of time in configuration with activity $A$"
+    x_label = "Activity, $A$"
+    plt.xlabel(x_label, labelpad=17)
+    plt.ylabel(y_label)
+    plt.title(r"$\nu={0}$".format(nu))
+    plt.grid()
+
+    i = 1
+    averager = Averager()
+    for fname in glob.glob(files):
+
+        with open(fname, 'r') as fh:
+            activity = np.genfromtxt(fname)
+            time_at_activity = find_time_at_activity(activity)
+            all_activity_vals = np.arange(np.max(activity)+1)
+            if avg is True:
+                averager.add_to_average(time_at_activity)
+
+        i += 1
+
+    if avg is True:
+        averager.normalise(i)
+        plt.plot(averager.avgd_data)
+
+    plt.show()
 
 
 def avg_and_save(files, filename):
@@ -206,7 +242,9 @@ def plot_next_activity(fname):
     ax.scatter(activity[:-1], activity[1:])
     plt.show(block=False)
 
+
 def autocorr(series, lag=1):
 
     series = pd.Series(series)
     return series.autocorr(lag=lag)
+
