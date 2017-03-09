@@ -115,7 +115,7 @@ def mean_time_fibrillating(activity):
 
 #### Generate patient specific simulation data ####
 
-def simulate_patient(patient, nus, state_file):
+def simulate_patient(patient, nus, state_file, realisations=range(params['realisations'])):
     """ state_file is initially None. This means in first call of run() a state file will be created.
         state_file is created with name: out_dir ( = os.path.dirname(dump_loc) ) + State-0
         Next call of run() want the state_file to be used to load the correct substrate.
@@ -128,10 +128,15 @@ def simulate_patient(patient, nus, state_file):
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
     
     for nu in nus:
-        for i in range(0, params['realisations']):
+        for i in realisations:
+
+            print "Realisation {0}/{1}".format(i, max(realisations))
 
             file_name = "/sim-patient-{2}-nu-{1}-Run-{0}".format(i, nu, patient)
             dump_loc = dirname + file_name
+
+            if os.path.exists(dump_loc):
+                raise Exception, "Data already exists."
 
             run(params['tmax'], params['heart_rate'], params['tissue_shape'], nu, params['d'],
                 params['e'], params['refractory_period'], False, dump_loc, None,
