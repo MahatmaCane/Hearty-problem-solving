@@ -8,7 +8,7 @@ from AFTools import *
 from AF import run
 from TPM import TPM
 
-params = dict(realisations = 40, tmax = 10e4, heart_rate = 220, 
+params = dict(realisations = 30, tmax = 10e4, heart_rate = 220, 
               tissue_shape = (200,200), d = 0.01, e = 0.05, 
               refractory_period = 50)
 
