@@ -4,6 +4,11 @@ import glob
 import matplotlib.pyplot as plt
 from AFTools import *
 
+import matplotlib as mpl
+label_size = 14
+mpl.rcParams['xtick.labelsize'] = label_size
+mpl.rcParams['ytick.labelsize'] = label_size 
+
 class TPM():
     def __init__(self, filepaths, nu, step = 1):
         """ Upon instanciating the TPM object, all files of a given nu for a patient should be used in
@@ -106,13 +111,17 @@ class TPM():
 
     def show(self):
     	""" Display the TPM """
+        tpm = np.ma.masked_where(self.tpm == 0, self.tpm)
+
+        cmap = plt.cm.YlOrRd
+        cmap.set_bad(color='black')
+
         fig = plt.figure(figsize=(6, 3.2))
         ax = fig.add_subplot(111)
-        ax.set_title('colorMap')
-        plt.imshow(self.tpm)
-        plt.title("TPM at "+r"$\nu = {0}$".format(self.nu))
-        plt.xlabel(r"$a(t+1)$")
-        plt.ylabel(r"$a(t)$")
+        plt.imshow(tpm, cmap = cmap)
+        plt.title("$p_{ij}$ \n", fontsize = 22)
+        plt.xlabel(r"$A(t)$", fontsize = 22, labelpad = 17)
+        plt.ylabel(r"$A(t+1)$", fontsize = 22)
         plt.colorbar(orientation='vertical')
         plt.show()
 
@@ -134,17 +143,20 @@ class TPM():
         r: The upper-triangular matrix (has same rank as TPM)
         """
         q, r = np.linalg.qr(self.tpm, mode = 'complete')
-        
+
         if show == True:
             fig = plt.figure(figsize=(6, 3.2))
             ax = fig.add_subplot(111)
-            ax.set_title('colorMap')
+            cmap = plt.cm.YlOrRd
+            cmap.set_bad(color='black')
             if output == 'r': 
-                plt.imshow(r)
-                plt.title("r matrix (same rank as TPM) \n from QR decomposition of TPM \n "+r"$\nu = {0}$".format(self.nu))
+            	r = np.ma.masked_where(r == 0, r)
+                plt.imshow(r, cmap = cmap)
+                plt.title("R matrix (same rank as TPM) \n from QR decomposition of TPM \n "+r"$\nu = {0}$".format(self.nu))
             elif output == 'q':
-            	plt.imshow(q)
-            	plt.title("q matrix (orthonormal columns) \n from QR decomposition of TPM \n "+r"$\nu = {0}$".format(self.nu))
+            	q = np.ma.masked_where(q == 0, q)
+            	plt.imshow(q, cmap = cmap)
+            	plt.title("Q matrix (orthonormal columns) \n from QR decomposition of TPM \n "+r"$\nu = {0}$".format(self.nu))
             plt.colorbar(orientation='vertical')
             plt.show()
 
@@ -152,3 +164,4 @@ class TPM():
         	return r
         if output == 'q':
         	return q
+

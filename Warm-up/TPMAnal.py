@@ -5,7 +5,6 @@ import pickle
 import matplotlib.pyplot as plt
 from AFTools import *
 from TPM import TPM
-
 import matplotlib as mpl
 label_size = 14
 mpl.rcParams['xtick.labelsize'] = label_size
@@ -41,6 +40,21 @@ def plot_mod_eigenvalues(filepaths, nu, step=1, block=False):
                c = mod_eigs == eigenvalue_with_largest_mod)
     fig.suptitle(r"$\Delta t = {0}$".format(step))
     plt.show(block=block)
+
+def plot_changing_mod_eigenvalues(files = [], nus = [], step = 1):
+
+    fig, (ax) = plt.subplots(1, 1)
+    ax = prepare_axes(ax, title=None, xlabel=r"Eigenvalue Rank, $i$",
+                      ylabel=r"Magnitude of $i^{th}$ Eigenvalue, $\vert \lambda_i \vert$")
+    i = 0
+    for filepaths in files:
+        tpm = TPM(filepaths, nus[i], step=step)
+        mod_eigs = tpm.get_mod_eigvals()
+        eigenvalue_with_largest_mod = np.max(mod_eigs)
+        ax.plot(range(np.size(mod_eigs)), mod_eigs, 'o', alpha=0.4, label = r"$\nu = {0}$".format(nus[i]))
+        i +=1
+    plt.legend()
+    plt.show()
 
 def plot_eigenvector_matrix(filepaths, nu, step=1):
 
@@ -143,14 +157,16 @@ def plot_diff_eigvals_multi_patient(rank_diff = [], patients = []):
     plt.ylabel("Eigenvalue difference, "+r"$\Delta$"+"$|\lambda_{m,n}|$", fontsize = 22)
     plt.show()
 
-def compute_baseline(patient, min_safe_nu = 0.6):
+def compute_baseline(patient):
     """ Function which takes in a patient's name, generates the eigval_diffs data for ranks 1,2
         uses data points from min_safe_nu upwards to estimate a baseline height. """
     
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])  
     nus, eigval_diffs = compute_eigval_diffs(patient, dirname)
-    lowest_nu_index = nus.index(min_safe_nu)          # Get index of lowest nu used in computing baseline
-    eigval_diffs = eigval_diffs[lowest_nu_index:]     # Cut list of eigval_diffs to only values to be used in computing baseline	    
+    if nus[-1] < 0.9:
+        raise "Must use value of nu = 0.9 or higher for computing baseline"
+    elif nus[-1] >= 0.9:
+        baseline = eigval_diffs[-1]     # Cut list of eigval_diffs to only values to be used in computing baseline	    
     
     return np.mean(eigval_diffs)
 
@@ -179,10 +195,17 @@ def baseline_change_indicator(patient, thresh = 0.0005, delta_nu = 0.05):
     print "Change not detected."
     return 
 
-def plot_rank_change(patient):
-    """ Plot showing how the rank of the TPM changes with nu"""
-    
-    dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
+def get_rank_change(patient):
+    """ Return the rank of the TPM as a function of nu"""
+    delta1 = ['A','C','E','G', 'H']
+    delta5 = ['I','J','K']
+
+    if patient in delta1:
+        dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], 0.01, params['e'])
+        delta = 0.01
+    elif patient in delta5:
+    	dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], 0.05, params['e'])
+        delta = 0.05
     nus = get_nus(dirname + '/')
     ranks = []
     for nu in nus:
@@ -191,8 +214,19 @@ def plot_rank_change(patient):
         tpm = TPM(filepaths, nu, step = 1)
         ranks.append(tpm.get_rank())
 
-    plt.plot(nus, ranks, 'o-')
+    return nus, ranks, delta
+
+def plot_rank_change(patients = []):
+
+    for patient in patients:
+        nus, ranks, delta = get_rank_change(patient)
+        plt.plot(nus, ranks, 'o-', label = 'Patient '+ patient + ', $\delta = {0}$'.format(delta))
     # plt.title()
+    plt.legend()
     plt.xlabel(r"$\nu$", fontsize = 22, labelpad = 17)
-    plt.ylabel("rank of transition probability matrix", fontsize = 22, labelpad = 17)
+    plt.ylabel("Rank of Transition Probability Matrix", fontsize = 22, labelpad = 17)
     plt.show()
+
+
+if __name__ == '__main__':
+    pass

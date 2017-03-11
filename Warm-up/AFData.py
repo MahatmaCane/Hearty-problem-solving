@@ -60,9 +60,9 @@ class Averager:
             else:
                 self.avgd_data[:data.size] += data
 
-    def normalise(self, norm_const):
+    def normalise(self):
 
-        self.avgd_data /= norm_const
+        self.avgd_data = self.avgd_data/np.sum(self.avgd_data, dtype=np.float)
 
 
 def __prepare_axes(ax, title=None, xlabel=None, ylabel=None):
@@ -79,14 +79,9 @@ def __prepare_axes(ax, title=None, xlabel=None, ylabel=None):
 
 def find_time_at_activity(data):
 
-    time_act = data
-    if isinstance(time_act, list):
-        time_act = np.array(time_act)
-    try:
-        activity = time_act[0, :]
-    except IndexError:
-        activity = time_act
-    time_at_activity = np.bincount([int(i) for i in activity]) / float(activity.size)
+    data = data.astype(np.int)
+    time_at_activity = np.bincount(data)
+    time_at_activity = time_at_activity/time_at_activity.sum(dtype=np.float)
 
     return time_at_activity
 
@@ -112,7 +107,7 @@ def basins_same_axes(files, nu, avg=False):
     for fname in glob.glob(files):
 
         with open(fname, 'r') as fh:
-            activity = pickle.load(fh)
+            activity = np.genfromtxt(fname)
             time_at_activity = find_time_at_activity(activity)
             all_activity_vals = np.arange(np.max(activity)+1)
             ax.plot(all_activity_vals, time_at_activity, '-',
@@ -124,41 +119,60 @@ def basins_same_axes(files, nu, avg=False):
 
     y_label = "$Mean\ fraction\ of\ time\ in\ config's\ with\ activity\ A$"
     if avg is True:
-        averager.normalise(i)
+        averager.normalise()
         avg_ax = __prepare_axes(avg_ax, xlabel="$Activity\ A$", ylabel=y_label)
         avg_ax.plot(averager.avgd_data)
 
-    plt.show(block=False)
+    plt.show()
 
 
-def plot_avg_occupancy_density(files, nu, avg=False):
+def plot_avg_occupancy_density(files = [], nus = []):
 
     """ Plot average occupancy density for simulations at a given nu."""
+    # Four axes, returned as a 2-d array
+    f, axarr = plt.subplots(2, 2,sharex=True)
 
-    ax = plt.gca()
-    y_label = "Mean fraction of time in configuration with activity $A$"
-    x_label = "Activity, $A$"
-    plt.xlabel(x_label, labelpad=17)
-    plt.ylabel(y_label)
-    plt.title(r"$\nu={0}$".format(nu))
-    plt.grid()
+    axarr[0, 0].set_title(r"$\nu={0}$".format(nus[0]))
+    axarr[0, 1].set_title(r"$\nu={0}$".format(nus[1]))
+    axarr[1, 0].set_title(r"$\nu={0}$".format(nus[2]))
+    axarr[1, 1].set_title(r"$\nu={0}$".format(nus[3]))
+    # Fine-tune figure; hide x ticks for top plots and y ticks for right plots
+    plt.setp([a.get_xticklabels() for a in axarr[0, :]], visible=False)
+    # plt.setp([a.get_yticklabels() for a in axarr[:, 1]], visible=False)
 
-    i = 1
-    averager = Averager()
-    for fname in glob.glob(files):
+    axarr[0, 0].grid()
+    axarr[0, 1].grid()
+    axarr[1, 0].grid()
+    axarr[1, 1].grid()
 
-        with open(fname, 'r') as fh:
-            activity = np.genfromtxt(fname)
-            time_at_activity = find_time_at_activity(activity)
-            all_activity_vals = np.arange(np.max(activity)+1)
-            if avg is True:
+    f.text(0.5, 0.04, "\n Activity, $A$", ha='center')
+    f.text(0.04, 0.5, "Mean fraction of time in configuration with activity $A$ \n" , va='center', rotation='vertical')
+    
+    j = 0
+    for nu in nus:
+        i = 1
+        averager = Averager()
+        for fname in glob.glob(files[j]):
+
+            with open(fname, 'r') as fh:
+                activity = np.genfromtxt(fname)
+                time_at_activity = find_time_at_activity(activity)  
+                all_activity_vals = np.arange(np.max(activity)+1)
+
                 averager.add_to_average(time_at_activity)
 
-        i += 1
+            i += 1
 
-    if avg is True:
-        averager.normalise(i)
-        plt.plot(averager.avgd_data)
+        averager.normalise()
+        if j == 0:
+            axarr[0, 0].plot(averager.avgd_data)
+        if j == 1:
+            axarr[0, 1].plot(averager.avgd_data)
+        if j == 2:
+            axarr[1, 0].plot(averager.avgd_data)
+        if j == 3:
+            axarr[1, 1].plot(averager.avgd_data)
+        j+=1
 
     plt.show()
 
@@ -247,4 +261,52 @@ def autocorr(series, lag=1):
 
     series = pd.Series(series)
     return series.autocorr(lag=lag)
+
+
+def compare_eigvec_occ_density(sim_files,  nu):
+    """ Plot to compare the eigenvector associate with the largest rank, with the average occupancy density plot. """
+
+    # fig, (real_ax, imag_ax, avg_ax) = plt.subplots(3, 1, sharex=True)
+    fig, (real_ax, avg_ax) = plt.subplots(2, 1, sharex=True)
+
+    tpm = TPM(sim_files, nu, step = 1)
+    eigval, eigvec = tpm.get_eig_val_and_associated_vec(1)
+    # real_ax.scatter(range(np.size(eigvec)), eigvec.real, linewidths=0, alpha=0.4)
+    real_ax.plot(range(np.size(eigvec)), eigvec.real, 'o-', alpha = 0.4)
+    # imag_ax.scatter(range(np.size(eigvec)), eigvec.imag, linewidths=0, alpha=0.4)
+    # real_ax.grid(True)
+    # imag_ax.grid(True)
+    # fig.suptitle(r"$\nu = {0}$".format(nu))
+    y_label = "Eigenvector \n of largest \n eigenvalue \n "
+    real_ax = __prepare_axes(real_ax, xlabel=None, ylabel=y_label)
+
+    # imag_ax.set_title("Im(eigenvector of largest eigenvalue)")
+
+    i = 1
+    averager = Averager()
+    for fname in glob.glob(sim_files):
+
+        with open(fname, 'r') as fh:
+            activity = np.genfromtxt(fname)
+            time_at_activity = find_time_at_activity(activity)
+            all_activity_vals = np.arange(np.max(activity)+1)    
+            averager.add_to_average(time_at_activity)
+
+        i += 1
+
+    averager.normalise()
+    y_label = "Mean fraction \n of time in \n configuration \n with activity \n $A$"
+    x_label = "Activity, $A$"
+    avg_ax = __prepare_axes(avg_ax, xlabel=x_label, ylabel=y_label)
+    avg_ax.plot(averager.avgd_data, 'o-', alpha = 0.4)
+
+    plt.show()
+
+
+
+
+
+
+
+
 
