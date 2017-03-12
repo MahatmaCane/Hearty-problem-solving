@@ -207,7 +207,7 @@ def activity_time_series(patient, nu, run, fancy = False):
 
     elif fancy == False:
         fig, (ax) = plt.subplots(1, 1)
-        ax.plot(activity, label = 'Patitnet: {0}'.format(patient))
+        ax.plot(activity, label = 'Patient: {0}'.format(patient))
     plt.xlabel("Time, $t$")
     plt.ylabel("Activity, $\mathcal{A}$")
     plt.legend()
@@ -398,7 +398,7 @@ def mean_frequency_of_episodes(patient, nu, realisations):
 
     result = float(episodes_counted)/realisations
 
-    with open(dirname + subdirname + 'nu-{0}-realisations-{1}'.format(nu,realisations), 'w') as fh:
+    with open(dirname + subdirname + '/nu-{0}-realisations-{1}'.format(nu,realisations), 'w') as fh:
         pickle.dump(result, fh)
 
     return result
@@ -412,7 +412,7 @@ def plot_mean_frequency_episodes(patient, nus, realisations):
 
     for nu in nus:
         try:
-            with open(dirname + subdirname +'nu-{0}-realisations-{1}'.format(nu,realisations), 'r') as fh:
+            with open(dirname + subdirname +'/nu-{0}-realisations-{1}'.format(nu,realisations), 'r') as fh:
                 data = pickle.load(fh)
             print "Succesfully loaded data for file_name: nu-{0}-realisations-{1}".format(nu,realisations)
             mean_freqs.append(data)
@@ -512,9 +512,9 @@ def survival_curves_plot(patient, nus):
     realisations = params['realisations']
 
     ax = plt.gca()
-    ax = prepare_axes(ax, title = 'Survival Curve', 
-                      ylabel = 'Probability of remaining in fibrillation',
-                      xlabel = 'Time spent in fibrillation')
+    ax = prepare_axes(ax, title = None, 
+                      ylabel = 'Probability of remaining in fibrillation, $P_{fib}$',
+                      xlabel = 'Time spent in fibrillation, $t$')
     n = len(nus)
     colour=iter(plt.cm.brg(np.linspace(0,0.9,n)))
 
@@ -530,8 +530,9 @@ def survival_curves_plot(patient, nus):
         ax.plot([i for i in range(0,len(P))], P, c=c, label = r' $\nu =$'+'${0}$'.format(nu))
 
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2),
-              ncol=6, fancybox=True, shadow=True)
+              ncol=6, fancybox=True, shadow=True, fontsize = 22)
     plt.show()
 
 if __name__ == "__main__":
     pass
+
