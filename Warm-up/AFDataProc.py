@@ -8,8 +8,8 @@ from AFTools import *
 from AF import run
 from TPM import TPM
 
-params = dict(realisations = 30, tmax = 10e4, heart_rate = 220, 
-              tissue_shape = (200,200), d = 0.01, e = 0.05, 
+params = dict(realisations = 40, tmax = 10e4, heart_rate = 220, 
+              tissue_shape = (200,200), d = 0.05, e = 0.05, 
               refractory_period = 50)
 
 #### Generic Functions Used Throughout ####
@@ -221,13 +221,9 @@ def generic_model_risk_curve():
     """ Generates the total_activity lists for each realisation of each nu, and saves them
         to a folder with appropriate file names. Saves the list of nus used."""
 
-    nus = [0.02, 0.04, 0.06, 0.08, 0.11, 
-           0.13, 0.15, 0.17, 0.19, 0.21, 
-           0.23, 0.25, 0.27, 0.29, 0.12, 
-           0.14, 0.16, 0.18, 0.2, 0.22, 
-           0.24, 0.26, 0.28, 0.3, 0.1]
+    nus = [0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3, 0.1]
 
-    dirname = '/Generic-Risk-Curve-{0}-{1}-{2}'.format(params['d'], params['e'], params['tmax'])
+    dirname = 'Generic-Risk-Curve-{0}-{1}-{2}'.format(params['d'], params['e'], params['tmax'])
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 

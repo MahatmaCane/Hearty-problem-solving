@@ -90,7 +90,7 @@ def plot_diff_eigvals_vs_nu(i,j, patient):
     plt.title("Difference between eigenvalues of rank {0} and {1} for {2} as a function of".format(i,j,patient) +r" $\nu$")
     plt.xlabel(r"$\nu$")
     plt.ylabel(r"$\Delta$"+" $\lambda_{0} - \lambda_{1}$".format(i,j))
-    plt.show()
+    plt.show(block=False)
 
 def compute_eigval_diffs(patient, dirname):
     nus = get_nus(dirname + '/')
@@ -122,15 +122,15 @@ def plot_diff_eigvals_multi_patient(rank_diff = [], patients = []):
                 tpm = TPM(filepaths,nu,step = 1)
                 eigval_diffs.append( tpm.get_diff_absolute_eig_vals(i,j) )
 
-            plt.plot(nus, eigval_diffs, 'o-', label = 'Patient {0}, (m,n) = ({1},{2})'.format(alphabet[k], i,j))
-            k += 1
+        plt.plot(nus, eigval_diffs, 'o-', label = 'Patient {0}, (m,n) = ({1},{2})'.format(alphabet[k], i,j))
+        k += 1
 
     plt.legend( bbox_to_anchor=(1.005 , 1), loc=2, borderaxespad=0., fancybox=True, shadow=True, fontsize = 22)
     # plt.title("Difference between eigenvalues of specified rank as a function of" +r" $\nu$", fontsize = 22)
     plt.grid()
     plt.xlabel("Probability of vertical coupling, "+r"$\nu$", fontsize = 22 , labelpad=17)
     plt.ylabel("Eigenvalue difference, "+r"$\Delta$"+"$|\lambda_{m,n}|$", fontsize = 22)
-    plt.show()
+    plt.show(block=False)
 
 def compute_baseline(patient, min_safe_nu = 0.6):
     """ Function which takes in a patient's name, generates the eigval_diffs data for ranks 1,2
@@ -138,34 +138,120 @@ def compute_baseline(patient, min_safe_nu = 0.6):
     
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])  
     nus, eigval_diffs = compute_eigval_diffs(patient, dirname)
-    lowest_nu_index = nus.index(min_safe_nu)          # Get index of lowest nu used in computing baseline
-    eigval_diffs = eigval_diffs[lowest_nu_index:]     # Cut list of eigval_diffs to only values to be used in computing baseline	    
-    
-    return np.mean(eigval_diffs)
+    # Get index of lowest nu used in computing baseline
+    check_greater = lambda x: x >= min_safe_nu
+    print "PATIENT:", patient
+    lowest_nu_index = np.where(np.cumsum(map(check_greater, nus)) == 1)[0][0]
+    print "LOWEST NU LOC:", lowest_nu_index
+    # Cut list of eigval_diffs to only values to be used in computing baseline
+    #eigval_diffs = eigval_diffs[lowest_nu_index:]
+    baseline = np.mean(eigval_diffs[lowest_nu_index:])
+    print "BASELINE:", baseline
+
+    return baseline, nus, eigval_diffs
 
 def baseline_change_indicator(patient, thresh = 0.0005, delta_nu = 0.05):
     """ Computes the value of nu at which the data points first cross the threshold,
         which is defined as a percentage increase, thresh, above the baseline. """
 
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])
-    nus, eigval_diffs = compute_eigval_diffs(patient,dirname)
+    #nus, eigval_diffs = compute_eigval_diffs(patient,dirname)
+    baseline, nus, eigval_diffs = compute_baseline(patient)
     nus.reverse()
     eigval_diffs.reverse()							
-    baseline = compute_baseline(patient)
+    #baseline = compute_baseline(patient)
     max_change = baseline + thresh*baseline
+    print "MAX CHANGE:", max_change
 
     for nu in nus:    #High to low
         i = nus.index(nu)
         if eigval_diffs[i] > max_change:
-            if nus[i] - nus[i-1] > delta_nu:
-                print "Not enough data points between nu = {0} and nu = {1}".format(nus[i],nus[i-1])
-                return
+            print "NU", nu
+            precision = nus[i] - nus[i-1]
+            if precision > delta_nu:
+                raise Exception("Not enough data points between nu = {0} and nu = {1}".format(nus[i],nus[i-1]))
             for nu1 in nus[i:]:
                 j = nus.index(nu1)
-                if np.absolute(eigval_diffs[j] - eigval_diffs[j-1]) > float(baseline)/2: #If there is a sudden drop in nu
+                # If there is a sudden drop in nu
+                if abs(eigval_diffs[j] - eigval_diffs[j-1]) > baseline/2.:
+                    print "NU1", nu1
                     nu_till_transition = np.absolute(nus[j-1] - nu)
-                    return nu, nu_till_transition
-    print "Change not detected."
-    return 
+                    return nu, nu_till_transition, precision
+    raise ValueError("Change not detected.")
 
+def prob_transition(patients, threshs, min_delt_nus=[0.2], nbins=100, ran=[0, 0.1]):
 
+    """
+    Produces a normalised 2D histogram of bin size bin_size. Element (i, j) of
+    the histogram is the probability that the transition from pure SR dynamics
+    to paroxysmal AF occurs in a ``fibrosis step'' in the range
+
+        [i*1/nbins, (i+1)*1/nbins)
+
+    (note the half-open interval) given a percentage change threshs[j].
+
+    Inputs:
+
+    - patients:     List of single capital letters indicating which patients 
+                    the histogram is to be produced from. Assumes patient 
+                    directories exist in the current directory.
+    - threshs:      List of floats in range [0, 1]. For the jth element thresh
+                    in this list, the spectral gap as a function of nu will be
+                    searched for a percentage increase of thresh. The bin
+                    corresponding to the change in nu to the transition and 
+                    the specified percentage increase will then increase in 
+                    count by 1.
+    - min_delt_nus: List of floats. Minimum required nu resolution in spectral
+                    gap data. If one element then each thresh in threshs will
+                    require an identical minimum resolution in spectral gap
+                    data at the point of crossing threshold.
+    - nbins:        int. Number of bins along y-axis of matrix.
+    """
+
+    print len(min_delt_nus)
+    if len(min_delt_nus) == 1:
+        print "Increase"
+        min_delt_nus *= len(threshs)
+    assert len(threshs) == len(min_delt_nus), "Could not broadcast."
+
+    hist = np.zeros((nbins, len(threshs)), dtype=np.float64)
+    # Need to think of a way to estimate errors! Have to account for both
+    # precision in point of crossing of threshold and point of transition.
+    #errors = np.zeros((nbins, len(threshs)))
+
+    for patient in patients:
+        delta_nus = []
+        for j, (thresh, mdn) in enumerate(zip(threshs, min_delt_nus)):
+            nu, nu_trans, error = baseline_change_indicator(patient,
+                                                            thresh=thresh,
+                                                            delta_nu=mdn)
+            print "THRESH:", thresh
+            print "DELTA NU:", nu_trans
+            delta_nus.append(nu_trans)
+        print threshs
+        print delta_nus
+        print "\n"
+        H, xedge, yedge = np.histogram2d(delta_nus, threshs, bins=[nbins, len(threshs)],
+                                         range=[ran,[min(threshs), max(threshs)]])
+        hist += H
+
+    # Normalise
+    normalisation = hist.sum(axis=0, dtype=np.float64)
+    normalisation[normalisation == 0.] = 1.
+    hist /= normalisation
+
+    del min_delt_nus
+
+    return hist
+
+def plot_prob_transition(patients, threshs, min_delt_nus=[0.2], nbins=100, ran=[0, 0.1]):
+
+    fig, (ax) = plt.subplots(1, 1)
+    p = prob_transition(patients, threshs, min_delt_nus, nbins, ran)
+    im = ax.pcolorfast(p)
+    plt.colorbar(im)
+    ax.set_ylabel(r"$\Delta \nu$")
+    ax.set_xlabel(r"$\Delta \lambda_{12}/\lambda_{12}$")
+    ax.set_title(r"$P(transition\ in\ \Delta \nu \vert \Delta \lambda_{12}/\lambda_{12})$")
+    plt.show(block=False)
+    return p

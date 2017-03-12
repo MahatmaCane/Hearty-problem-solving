@@ -56,9 +56,9 @@ class Averager:
             else:
                 self.avgd_data[:data.size] += data
 
-    def normalise(self, norm_const):
+    def normalise(self):
 
-        self.avgd_data /= norm_const
+        self.avgd_data = self.avgd_data/np.sum(self.avgd_data, dtype=np.float)
 
 
 def __prepare_axes(ax, title=None, xlabel=None, ylabel=None):
@@ -75,14 +75,9 @@ def __prepare_axes(ax, title=None, xlabel=None, ylabel=None):
 
 def find_time_at_activity(data):
 
-    time_act = data
-    if isinstance(time_act, list):
-        time_act = np.array(time_act)
-    try:
-        activity = time_act[0, :]
-    except IndexError:
-        activity = time_act
-    time_at_activity = np.bincount(activity) / float(activity.size)
+    data = data.astype(np.int)
+    time_at_activity = np.bincount(data)
+    time_at_activity = time_at_activity/time_at_activity.sum(dtype=np.float)
 
     return time_at_activity
 
@@ -108,7 +103,8 @@ def basins_same_axes(files, nu, avg=False):
     for fname in glob.glob(files):
 
         with open(fname, 'r') as fh:
-            activity = pickle.load(fh)
+            activity = np.genfromtxt(fh)
+            print activity
             time_at_activity = find_time_at_activity(activity)
             all_activity_vals = np.arange(np.max(activity)+1)
             ax.plot(all_activity_vals, time_at_activity, '-',
@@ -120,9 +116,10 @@ def basins_same_axes(files, nu, avg=False):
 
     y_label = "$Mean\ fraction\ of\ time\ in\ config's\ with\ activity\ A$"
     if avg is True:
-        averager.normalise(i)
+        averager.normalise()
         avg_ax = __prepare_axes(avg_ax, xlabel="$Activity\ A$", ylabel=y_label)
         avg_ax.plot(averager.avgd_data)
+        print "Integral over all A = {0}".format(np.sum(averager.avgd_data))
 
     plt.show(block=False)
 
