@@ -217,11 +217,17 @@ def activity_time_series(patient, nu, run, fancy = False):
 
 #### Determining Critical Threshold - Risk Curve ####
 
-def generic_model_risk_curve():
+def generic_model_risk_curve(realisations=params['realisations']):
     """ Generates the total_activity lists for each realisation of each nu, and saves them
         to a folder with appropriate file names. Saves the list of nus used."""
 
-    nus = [0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3, 0.1]
+    kishanNus = [0.02, 0.04, 0.06, 0.08, 0.11,
+                 0.13, 0.15, 0.17, 0.19, 0.21,
+                 0.23, 0.25, 0.27, 0.29, 0.12,
+                 0.14, 0.16, 0.18, 0.2, 0.22,
+                 0.24, 0.26, 0.28, 0.3, 0.1]
+
+    nus = [nu for nu in kishanNus if 0.1 <= nu <= 0.16]
 
     dirname = 'Generic-Risk-Curve-{0}-{1}-{2}'.format(params['d'], params['e'], params['tmax'])
     if not os.path.exists(dirname):
@@ -237,7 +243,7 @@ def generic_model_risk_curve():
         for nu in nus:
             time_in_AF = []
 
-            for i in range(0, params['realisations']):
+            for i in range(*realisations):
                 try:
                     activity = [i for i in np.genfromtxt(dirname + '/Run-{0}-nu-{1}'.format(i, nu))]
                     mean_time_in_fib = mean_time_fibrillating(activity)
@@ -261,12 +267,6 @@ def generic_model_risk_curve():
             pickle.dump(mean_time_in_AF, std_devs)
 
 
-    kishanNus = [0.02, 0.04, 0.06, 0.08, 0.11, 
-                 0.13, 0.15, 0.17, 0.19, 0.21, 
-                 0.23, 0.25, 0.27, 0.29, 0.12, 
-                 0.14, 0.16, 0.18, 0.2, 0.22, 
-                 0.24, 0.26, 0.28, 0.3, 0.1]
-    
     kishanMeanAF = [0.99981, 0.99983,0.9998,0.99968, 0.99772, 0.96099, 
                     0.60984, 0.16381, 0.017807, 0.020737, 4.922e-05, 0.0001084,
                     0,0, 0.99152, 0.86184, 0.29714, 0.039206, 0.0056277,

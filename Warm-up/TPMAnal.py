@@ -14,6 +14,8 @@ params = dict(realisations = 40, tmax = 10e4, heart_rate = 220,
               tissue_shape = (200,200), d = 0.05 , e = 0.05, 
               refractory_period = 50)
 
+plt.ion()
+
 def argand_eigenvalues(filepaths, nu, step=1):
 
     """ Plot Argand diagram of eigenvalues. """
@@ -308,6 +310,38 @@ def plot_rank_change(patients = []):
     plt.ylabel("Rank of Transition Probability Matrix", fontsize = 22, labelpad = 17)
     plt.show()
 
+
+def plot_basin_peak_vs_nu(patient_dir):
+
+    nus = get_nus(patient_dir)
+    upper_basin_peaks = []
+    upper_basin_peak_locs = {}
+    patient = patient_dir.split("-")[1]
+    fig, (ax, occ_ax) = plt.subplots(2, 1)
+    for nu in nus:
+        fname = "/sim-patient-{0}-nu-{1}-Run-*".format(patient, nu)
+        filepaths = patient_dir + fname
+        tpm = TPM(filepaths, nu)
+        occ_dens_index = np.where(tpm.eigenvalues == np.max(tpm.eigenvalues))
+        occ_vec = tpm.eigenvector_matrix[:, occ_dens_index[0]].real
+        if np.sum(occ_vec <= 0.) == occ_vec.size:
+            occ_vec *= -1.
+        elif np.sum(occ_vec >= 0.) != occ_vec.size:
+            print np.sum(occ_vec >= 0.)
+            raise Warning("Occupancy density is not strictly non-negative")
+        if occ_vec.size <= 250:
+            upper_basin_peaks.append(0.)
+            continue
+        upper_basin_peaks.append(np.max(occ_vec[250:]))
+        peak_loc = np.where(occ_vec == np.max(occ_vec[250:]))[0][0]
+        print peak_loc
+        upper_basin_peak_locs[nu] = peak_loc
+    occ_ax.plot(upper_basin_peak_locs.keys(), upper_basin_peak_locs.values(),
+                'x')
+    prepare_axes(ax, xlabel=r"$\nu$", title="Patient " + patient,
+                 ylabel="Eigenvector centrality of upper basin")
+    ax.plot(nus, upper_basin_peaks, 'x-')
+    plt.show()
 
 if __name__ == '__main__':
     pass

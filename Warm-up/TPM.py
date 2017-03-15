@@ -9,6 +9,8 @@ label_size = 14
 mpl.rcParams['xtick.labelsize'] = label_size
 mpl.rcParams['ytick.labelsize'] = label_size 
 
+plt.ion()
+
 class TPM():
     def __init__(self, filepaths, nu, step = 1):
         """ Upon instanciating the TPM object, all files of a given nu for a patient should be used in
