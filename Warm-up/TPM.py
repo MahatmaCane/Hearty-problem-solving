@@ -116,11 +116,11 @@ class TPM():
         tpm = np.ma.masked_where(self.tpm == 0, self.tpm)
 
         cmap = plt.cm.YlOrRd
-        cmap.set_bad(color='black')
+        cmap.set_bad(color='blue')
 
         fig = plt.figure(figsize=(6, 3.2))
         ax = fig.add_subplot(111)
-        plt.imshow(tpm, cmap = cmap)
+        plt.imshow(tpm.T, cmap = cmap)
         plt.title("$p_{ij}$ \n", fontsize = 22)
         plt.xlabel(r"$A(t)$", fontsize = 22, labelpad = 17)
         plt.ylabel(r"$A(t+1)$", fontsize = 22)
