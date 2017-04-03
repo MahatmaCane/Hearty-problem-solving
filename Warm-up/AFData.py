@@ -264,6 +264,33 @@ def autocorr(series, lag=1):
     series = pd.Series(series)
     return series.autocorr(lag=lag)
 
+def get_autocorrs_nus(patient, nus, delta=0.01, eps=0.05, lag=1):
+
+    auto_corrs = []
+    errors = []
+    patient_dir = "Patient-{0}-100000.0-{1}-{2}".format(patient, delta, eps)
+    for nu in nus:
+        print "NU: {0}".format(nu), "\n"
+        auts = []
+        sub_files = "/sim-patient-A-nu-{0}-Run-*".format(nu)
+        files = glob.glob(patient_dir + sub_files)
+        for f in files:
+            print "FILE: {0}",format(f)
+            data = np.genfromtxt(f)
+            a = autocorr(data)
+            auts.append(a)
+        auto_corrs.append(np.mean(auts))
+        errors.append(np.std(errors))
+    return auto_corrs, errors
+
+def plot_autocorrs_nus(patient, nus, delta=0.01, eps=0.05, lag=1):
+
+    autcors, errs = get_autocorrs_nus(patient, nus, delta, eps, lag)
+    fig, (ax) = plt.subplots(1, 1)
+    ax.errorbar(nus, autcors, yerr=errs, fmt='x')
+    ax.set_xlabel(r"$\nu$")
+    ax.set_ylabel("Lag-1 autocorrelation in data")
+    plt.show()
 
 def compare_eigvec_occ_density(sim_files,  nu):
     """ Plot to compare the eigenvector associate with the largest rank, with the average occupancy density plot. """
@@ -274,6 +301,7 @@ def compare_eigvec_occ_density(sim_files,  nu):
     tpm = TPM(sim_files, nu, step = 1)
     eigval, eigvec = tpm.get_eig_val_and_associated_vec(1)
     # real_ax.scatter(range(np.size(eigvec)), eigvec.real, linewidths=0, alpha=0.4)
+    eigvec = eigvec/np.sum(eigvec).real
     real_ax.plot(range(np.size(eigvec)), eigvec.real, 'o-', alpha = 0.4)
     # imag_ax.scatter(range(np.size(eigvec)), eigvec.imag, linewidths=0, alpha=0.4)
     # real_ax.grid(True)
@@ -297,8 +325,8 @@ def compare_eigvec_occ_density(sim_files,  nu):
         i += 1
 
     averager.normalise()
-    y_label = "Mean fraction \n of time in \n configuration \n with activity \n $A$"
-    x_label = "Activity, $A$"
+    y_label = "Mean fraction \n of time in \n configuration \n with activity \n $a$"
+    x_label = "Activity, $a$"
     avg_ax = __prepare_axes(avg_ax, xlabel=x_label, ylabel=y_label)
     avg_ax.plot(averager.avgd_data, 'o-', alpha = 0.4)
 

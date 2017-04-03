@@ -227,7 +227,7 @@ def generic_model_risk_curve(realisations=params['realisations']):
                  0.14, 0.16, 0.18, 0.2, 0.22,
                  0.24, 0.26, 0.28, 0.3, 0.1]
 
-    nus = [nu for nu in kishanNus if 0.1 <= nu <= 0.16]
+    nus = list(set(kishanNus) - set([nu for nu in kishanNus if 0.1 <= nu <= 0.16]))
 
     dirname = 'Generic-Risk-Curve-{0}-{1}-{2}'.format(params['d'], params['e'], params['tmax'])
     if not os.path.exists(dirname):
@@ -267,10 +267,11 @@ def generic_model_risk_curve(realisations=params['realisations']):
             pickle.dump(mean_time_in_AF, std_devs)
 
 
-    kishanMeanAF = [0.99981, 0.99983,0.9998,0.99968, 0.99772, 0.96099, 
-                    0.60984, 0.16381, 0.017807, 0.020737, 4.922e-05, 0.0001084,
-                    0,0, 0.99152, 0.86184, 0.29714, 0.039206, 0.0056277,
-                    4.834e-05, 0.00082172, 0,0,9.406e-05, 0.99919]
+    kishanMeanAF = [0.99981, 0.99983, 0.9998, 0.99968, 0.99772,
+                    0.96099, 0.60984, 0.16381, 0.017807, 0.020737, 
+                    4.922e-05, 0.0001084, 0, 0, 0.99152, 
+                    0.86184, 0.29714, 0.039206, 0.0056277, 4.834e-05,
+                    0.00082172, 0, 0, 9.406e-05, 0.99919]
     
     kishanStdDevs = [4.3015e-06, 3.8088e-06, 1.0454e-05, 3.0663e-05, 0.00044859, 
                      0.018246, 0.054379, 0.041092, 0.0080603, 0.016513, 4.8685e-05, 

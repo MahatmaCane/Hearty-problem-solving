@@ -35,6 +35,7 @@ class TPM():
             dim = None
             for fname in glob.glob(filepaths):
                 activity = np.genfromtxt(fname)
+                print activity
                 # +1 ensures that matrix dimensions allow activity values of 0 and dim
                 this_max_act = np.max(activity) + 1
                 if dim is None:
@@ -121,9 +122,9 @@ class TPM():
         fig = plt.figure(figsize=(6, 3.2))
         ax = fig.add_subplot(111)
         plt.imshow(tpm.T, cmap = cmap)
-        plt.title("$p_{ij}$ \n", fontsize = 22)
-        plt.xlabel(r"$A(t)$", fontsize = 22, labelpad = 17)
-        plt.ylabel(r"$A(t+1)$", fontsize = 22)
+        plt.title("$P_{ij}$ \n", fontsize = 25)
+        plt.xlabel(r"$a(t)$", fontsize = 25, labelpad = 17)
+        plt.ylabel(r"$a(t+1)$", fontsize = 25)
         plt.colorbar(orientation='vertical')
         plt.show()
 

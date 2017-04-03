@@ -108,13 +108,14 @@ def plot_diff_eigvals_vs_nu(i,j, patient):
         eigval_diffs.append( tpm.get_diff_absolute_eig_vals(i,j) )
     
     plt.plot(nus, eigval_diffs, 'o-')
-    plt.title("Difference between eigenvalues of rank {0} and {1} for {2} as a function of".format(i,j,patient) +r" $\nu$")
-    plt.xlabel(r"$\nu$")
-    plt.ylabel(r"$\Delta$"+" $\lambda_{0} - \lambda_{1}$".format(i,j))
+    plt.xlabel(r"$\nu$", fontsize=25)
+    plt.ylabel(r"$\sigma (P) \vert_{\nu}$", fontsize=25)
+    plt.grid()
     plt.show(block=False)
 
 def compute_eigval_diffs(patient, dirname):
     nus = get_nus(dirname + '/')
+    print nus
     eigval_diffs = []
     for nu in nus:
         file_name = "/sim-patient-{0}-nu-{1}-Run-*".format(patient, nu)
@@ -132,8 +133,8 @@ def plot_diff_eigvals_multi_patient(rank_diff = [], patients = []):
     k = 0
     alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','Z','W','X','Y','Z']
     
-    delta1 = ['A','C','E','G', 'H']
-    delta5 = ['I','J','K']
+    delta1 = ["A", "B", "C", "D", "E", "F", "G", "H", "X"]
+    delta5 = ["I", "J", "K", "L", "M", "N", "P", "Q", "T"]
 
     for patient in patients:
     	if patient in delta1:
@@ -149,14 +150,14 @@ def plot_diff_eigvals_multi_patient(rank_diff = [], patients = []):
                 tpm = TPM(filepaths,nu,step = 1)
                 eigval_diffs.append( tpm.get_diff_absolute_eig_vals(i,j) )
 
-        plt.plot(nus, eigval_diffs, 'o-', label = 'Patient {0}, (m,n) = ({1},{2})'.format(alphabet[k], i,j))
+        plt.plot(nus, eigval_diffs, 'o-', label = 'Patient {0}'.format(alphabet[k]))
         k += 1
 
     plt.legend( bbox_to_anchor=(1.005 , 1), loc=2, borderaxespad=0., fancybox=True, shadow=True, fontsize = 22)
     # plt.title("Difference between eigenvalues of specified rank as a function of" +r" $\nu$", fontsize = 22)
     plt.grid()
-    plt.xlabel("Probability of vertical coupling, "+r"$\nu$", fontsize = 22 , labelpad=17)
-    plt.ylabel("Eigenvalue difference, "+r"$\Delta$"+"$|\lambda_{m,n}|$", fontsize = 22)
+    plt.xlabel(r"$\nu$", fontsize = 25 , labelpad=17)
+    plt.ylabel(r"$\sigma (P)\vert_{\nu}$", fontsize = 25)
     plt.show(block=False)
 
 def compute_baseline(patient):
@@ -165,9 +166,9 @@ def compute_baseline(patient):
     
     dirname = 'Patient-{0}-{1}-{2}-{3}'.format(patient, params['tmax'], params['d'], params['e'])  
     nus, eigval_diffs = compute_eigval_diffs(patient, dirname)
-    if nus[-1] < 0.9:
+    if nus[-1] < 0.7:
         raise "Must use value of nu = 0.9 or higher for computing baseline"
-    elif nus[-1] >= 0.9:
+    elif nus[-1] >= 0.7:
         baseline = eigval_diffs[-1]     # Cut list of eigval_diffs to only values to be used in computing baseline	    
     
     return baseline, nus, eigval_diffs
@@ -270,11 +271,24 @@ def plot_prob_transition(patients, threshs, min_delt_nus=[0.2], nbins=100, ran=[
 
     fig, (ax) = plt.subplots(1, 1)
     p = prob_transition(patients, threshs, min_delt_nus, nbins, ran)
-    im = ax.pcolorfast(p)
+    cum_p = np.cumsum(p, axis=0)
+    im = ax.pcolorfast(cum_p)
     plt.colorbar(im)
-    ax.set_ylabel(r"$\Delta \nu$")
-    ax.set_xlabel(r"$\Delta \lambda_{12}/\lambda_{12}$")
-    ax.set_title(r"$P(transition\ in\ \Delta \nu \vert \Delta \lambda_{12}/\lambda_{12})$")
+    ax.set_ylabel(r"$\Delta \nu$", fontsize=30)
+    ax.set_xlabel(r"$\Delta$", fontsize=30)
+    ax.set_title(r"$P(transition\ in\ \Delta \nu \vert \Delta)$", fontsize=30)
+    ax.set_xticklabels(threshs)
+    xax = ax.get_xaxis()
+    # Set tick locations as centre of column corresponding to each change in gap
+    #r = [i/float(2*len(threshs)) for i in xrange(2*len(threshs)) if i%2 == 1]
+    #print r
+    xax.set_ticks([])
+    xax.labelpad = 20
+    yax = ax.get_yaxis()
+    yax.set_ticks([])
+    yax.labelpad = 20
+    #print np.linspace(min(ran), max(ran), nbins)
+    #ax.set_yticklabels(["{0}".format(i) for i in np.linspace(min(ran), max(ran), nbins)])
     plt.show(block=False)
     return p
 
