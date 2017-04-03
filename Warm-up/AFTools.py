@@ -104,3 +104,12 @@ def get_nus(directory):
         nus.add(float(nu))
 
     return sorted(nus)
+
+def no_reals(dirname, nus):
+
+    no_reals = []
+    for nu in nus:
+        files = dirname + "/Run-*-nu-{0}".format(nu)
+        reals = len(glob.glob(files))
+        no_reals.append(reals)
+    return dict(zip(nus, no_reals))
